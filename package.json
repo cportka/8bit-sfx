@@ -1,0 +1,40 @@
+{
+  "name": "8bit-sfx",
+  "version": "0.3.0",
+  "description": "2000+ free, deterministic, procedurally generated 8-bit sound effects (WAV) with a tiny dependency-free JS API for browsers and Node.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./manifest": "./sfx/manifest.json",
+    "./sfx/*": "./sfx/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "sfx",
+    "scripts/generate_sfx.py",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "test": "bash tests/run-tests.sh",
+    "generate": "python3 scripts/generate_sfx.py"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cportka/8bit-sfx.git"
+  },
+  "keywords": [
+    "8bit",
+    "chiptune",
+    "sfx",
+    "sound-effects",
+    "game-audio",
+    "wav",
+    "webaudio",
+    "procedural",
+    "retro"
+  ],
+  "author": "Chris Portka <chrisportka@gmail.com>",
+  "license": "MIT"
+}

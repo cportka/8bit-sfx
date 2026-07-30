@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>8bit-sfx — sound tester</title>
+<style>
+  :root {
+    --bg: #16121f; --panel: #201a2e; --ink: #e8e2f4; --dim: #8f85a8;
+    --accent: #7ee787; --accent2: #c792ea; --hot: #ffb454;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 1.5rem; background: var(--bg); color: var(--ink);
+    font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  header { max-width: 64rem; margin: 0 auto 1.2rem; }
+  h1 { font-size: 1.4rem; margin: 0 0 .3rem; }
+  h1 .v { color: var(--dim); font-size: .9rem; }
+  header p { color: var(--dim); margin: .2rem 0; font-size: .85rem; }
+  header a { color: var(--accent2); }
+  main { max-width: 64rem; margin: 0 auto; }
+  .bar { display: flex; gap: .6rem; flex-wrap: wrap; margin: 1rem 0; }
+  input[type=search] {
+    flex: 1; min-width: 12rem; background: var(--panel); border: 1px solid #3a3152;
+    color: var(--ink); padding: .5rem .7rem; border-radius: 6px; font: inherit;
+  }
+  button {
+    background: var(--panel); border: 1px solid #3a3152; color: var(--ink);
+    padding: .45rem .8rem; border-radius: 6px; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent2); }
+  .cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: .6rem; }
+  .cat {
+    background: var(--panel); border: 1px solid #3a3152; border-radius: 8px;
+    padding: .7rem .8rem; cursor: pointer;
+  }
+  .cat:hover { border-color: var(--accent); }
+  .cat.open { border-color: var(--accent); }
+  .cat b { color: var(--accent); }
+  .cat small { color: var(--dim); display: block; margin-top: .15rem; }
+  .fx { display: flex; flex-wrap: wrap; gap: .35rem; margin: .8rem 0 1.4rem; }
+  .fx button { font-size: .78rem; padding: .3rem .55rem; }
+  .fx button.playing { border-color: var(--hot); color: var(--hot); }
+  .fx button small { color: var(--dim); }
+  #status { color: var(--dim); font-size: .8rem; min-height: 1.2em; margin: .4rem 0; }
+  footer { max-width: 64rem; margin: 2rem auto 0; color: var(--dim); font-size: .8rem; }
+  footer code { color: var(--accent2); }
+</style>
+</head>
+<body>
+<header>
+  <h1>8bit-sfx <span class="v" id="version"></span></h1>
+  <p id="summary">loading manifest…</p>
+  <p>free 8-bit sound effects — <a href="https://github.com/cportka/8bit-sfx">github.com/cportka/8bit-sfx</a>
+     · <code>npm install 8bit-sfx</code> · click anything to play</p>
+</header>
+<main>
+  <div class="bar">
+    <input type="search" id="q" placeholder="search effects… (e.g. dog_0, splash, menu)">
+    <button id="rand">🎲 random</button>
+    <button id="stop">■ stop</button>
+  </div>
+  <div id="status"></div>
+  <div class="cats" id="cats"></div>
+  <div class="fx" id="fx"></div>
+</main>
+<footer>
+  <p>Every effect is deterministic — regenerate byte-for-byte with
+     <code>python3 scripts/generate_sfx.py</code>. The <code>pixelrpg</code> category is the
+     complete ported sound set of <a href="https://github.com/cportka/pixel-rpg">pixel-rpg</a>.</p>
+</footer>
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  let manifest;
+  try {
+    const res = await fetch('sfx/manifest.json');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    manifest = await res.json();
+  } catch (err) {
+    $('summary').textContent = 'failed to load sfx/manifest.json — ' + err.message;
+    return;
+  }
+  const effects = manifest.effects;
+  const cats = [...new Set(effects.map((e) => e.category))];
+  $('version').textContent = manifest.version ? 'v' + manifest.version : '';
+  $('summary').textContent =
+    `${manifest.count} effects · ${cats.length} categories · ${manifest.format}`;
+
+  let current = null;
+  let openCat = null;
+  const play = (e, btn) => {
+    if (current) current.pause();
+    current = new Audio('sfx/' + e.file);
+    current.play().catch((err) => {
+      if (err.name !== 'AbortError') $('status').textContent = `could not play ${e.file}: ${err.message}`;
+    });
+    $('status').textContent = `▶ ${e.file} (${e.duration_s}s)`;
+    document.querySelectorAll('.fx button.playing').forEach((b) => b.classList.remove('playing'));
+    if (btn) {
+      btn.classList.add('playing');
+      current.addEventListener('ended', () => btn.classList.remove('playing'));
+    }
+  };
+
+  const renderFx = (list) => {
+    const box = $('fx');
+    box.textContent = '';
+    for (const e of list.slice(0, 400)) {
+      const b = document.createElement('button');
+      const name = e.file.split('/').pop().replace('.wav', '');
+      b.append(name + ' ');
+      const small = document.createElement('small');
+      small.textContent = e.duration_s + 's';
+      b.appendChild(small);
+      b.addEventListener('click', () => play(e, b));
+      box.appendChild(b);
+    }
+    if (list.length > 400) {
+      const note = document.createElement('span');
+      note.textContent = ` …${list.length - 400} more (narrow the search)`;
+      box.appendChild(note);
+    }
+  };
+
+  const renderCats = () => {
+    const box = $('cats');
+    box.textContent = '';
+    for (const c of cats) {
+      const list = effects.filter((e) => e.category === c);
+      const d = document.createElement('div');
+      d.className = 'cat' + (openCat === c ? ' open' : '');
+      const label = document.createElement('b');
+      label.textContent = c;
+      const small = document.createElement('small');
+      small.textContent = `${list.length} effects — click to browse (a random sample plays on open)`;
+      d.append(label, ' ', small);
+      d.addEventListener('click', () => {
+        openCat = openCat === c ? null : c;
+        renderCats();
+        renderFx(openCat ? list : []);
+        if (openCat) play(list[Math.floor(Math.random() * list.length)]);
+      });
+      box.appendChild(d);
+    }
+  };
+
+  $('q').addEventListener('input', () => {
+    const q = $('q').value.trim().toLowerCase();
+    openCat = null;
+    renderCats();
+    renderFx(q ? effects.filter((e) => e.file.toLowerCase().includes(q)) : []);
+  });
+  $('rand').addEventListener('click', () => {
+    play(effects[Math.floor(Math.random() * effects.length)]);
+  });
+  $('stop').addEventListener('click', () => {
+    if (current) current.pause();
+    $('status').textContent = '';
+    document.querySelectorAll('.fx button.playing').forEach((b) => b.classList.remove('playing'));
+  });
+
+  renderCats();
+})();
+</script>
+</body>
+</html>

@@ -19,8 +19,10 @@ if manifest["count"] != len(manifest["effects"]):
     errs.append("manifest count field disagrees with its own entries")
 if len(files) != len(listed) or [f.removeprefix("sfx/") for f in files] != listed:
     errs.append("files on disk (%d) do not match manifest entries (%d)" % (len(files), len(listed)))
-if not 950 <= len(files) <= 1050:
-    errs.append("expected ~1000 effects, found %d" % len(files))
+if not 1950 <= len(files) <= 2150:
+    errs.append("expected ~2000+ effects, found %d" % len(files))
+if sum(1 for e in manifest["effects"] if e["category"] == "pixelrpg") != 24:
+    errs.append("pixelrpg ported set should have exactly 24 sounds")
 
 for f in files:
     try:
@@ -41,7 +43,9 @@ EOF
 # Determinism spot-check: regenerate a few effects and compare byte-for-byte.
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-python3 scripts/generate_sfx.py --out "$tmp" --only jump_007 explosion_042 jingle_099 || exit 1
-for f in jump/jump_007 explosion/explosion_042 jingle/jingle_099; do
+python3 scripts/generate_sfx.py --out "$tmp" \
+  --only jump_007 explosion_042 jingle_099 water_013 footstep_055 pixelrpg_zombie || exit 1
+for f in jump/jump_007 explosion/explosion_042 jingle/jingle_099 \
+         water/water_013 footstep/footstep_055 pixelrpg/pixelrpg_zombie; do
   cmp -s "sfx/$f.wav" "$tmp/$f.wav" || { echo "  generator drift: $f.wav" >&2; exit 1; }
 done
