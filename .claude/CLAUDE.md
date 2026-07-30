@@ -132,9 +132,10 @@ repo's configured identity, treats signatures as informational) and refreshes a 
 
 The block above is the generic Portka standard. A few points are concrete **in this repository**:
 
-- **Version source of truth is the bare `VERSION` file** (this repo has no `package.json` or other
-  manifest). `CHANGELOG.md` gets one `## [x.y.z]` section per release, and the `**Version:**` line
-  in `README.md` must match — `tests/run-tests.sh` and the `validate` CI workflow enforce the sync.
+- **Version source of truth is `package.json`** (the repo is an npm package; the bare `VERSION`
+  file it started with is gone). `CHANGELOG.md` gets one `## [x.y.z]` section per release, and the
+  `**Version:**` line in `README.md` must match — `tests/run-tests.sh` and the `validate` CI
+  workflow enforce the sync. npm publishing, like tagging, is the owner's manual release step.
 - **Commit identity for this repo:** author/committer commits as `Chris Portka
   <chrisportka@gmail.com>` (`git config user.name "Chris Portka"; git config user.email
   "chrisportka@gmail.com"`) — the concrete value the managed block's *Commit identity*
