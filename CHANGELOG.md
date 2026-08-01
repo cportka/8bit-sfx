@@ -6,6 +6,11 @@ Every change bumps the version and adds an entry below.
 
 ## [0.4.1] - 2026-08-01
 
+### Added
+- Funding metadata: `.github/FUNDING.yml` (GitHub Sponsors, Buy Me a Coffee, Venmo,
+  BTC/ETH) and the matching `funding` field in `package.json`, which npm surfaces via
+  `npm fund` once the package is published.
+
 ### Fixed
 - `docs/npm-package-info.md`: the publish guide now covers npm's `E403 … Two-factor
   authentication or granular access token with bypass 2fa enabled is required` refusal —

@@ -36,5 +36,19 @@
     "retro"
   ],
   "author": "Chris Portka <chrisportka@gmail.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "funding": [
+    {
+      "type": "github",
+      "url": "https://github.com/sponsors/cportka"
+    },
+    {
+      "type": "buy_me_a_coffee",
+      "url": "https://buymeacoffee.com/chrisportka"
+    },
+    {
+      "type": "individual",
+      "url": "https://venmo.com/portka"
+    }
+  ]
 }
