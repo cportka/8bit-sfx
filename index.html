@@ -7,44 +7,51 @@
 <style>
   :root {
     --bg: #16121f; --panel: #201a2e; --ink: #e8e2f4; --dim: #8f85a8;
-    --accent: #7ee787; --accent2: #c792ea; --hot: #ffb454;
+    --accent: #7ee787; --accent2: #c792ea; --hot: #ffb454; --line: #3a3152;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; padding: 1.5rem; background: var(--bg); color: var(--ink);
     font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
   }
-  header { max-width: 64rem; margin: 0 auto 1.2rem; }
+  header, main, footer { max-width: 72rem; margin: 0 auto; }
+  header { margin-bottom: 1.2rem; }
   h1 { font-size: 1.4rem; margin: 0 0 .3rem; }
   h1 .v { color: var(--dim); font-size: .9rem; }
   header p { color: var(--dim); margin: .2rem 0; font-size: .85rem; }
   header a { color: var(--accent2); }
-  main { max-width: 64rem; margin: 0 auto; }
   .bar { display: flex; gap: .6rem; flex-wrap: wrap; margin: 1rem 0; }
   input[type=search] {
-    flex: 1; min-width: 12rem; background: var(--panel); border: 1px solid #3a3152;
+    flex: 1; min-width: 12rem; background: var(--panel); border: 1px solid var(--line);
     color: var(--ink); padding: .5rem .7rem; border-radius: 6px; font: inherit;
   }
   button {
-    background: var(--panel); border: 1px solid #3a3152; color: var(--ink);
+    background: var(--panel); border: 1px solid var(--line); color: var(--ink);
     padding: .45rem .8rem; border-radius: 6px; font: inherit; cursor: pointer;
   }
   button:hover { border-color: var(--accent2); }
-  .cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: .6rem; }
-  .cat {
-    background: var(--panel); border: 1px solid #3a3152; border-radius: 8px;
-    padding: .7rem .8rem; cursor: pointer;
+  .cats { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .cats button { padding: .35rem .75rem; font-size: .85rem; }
+  .cats button.open { border-color: var(--accent); color: var(--accent); }
+  #status { color: var(--dim); font-size: .8rem; min-height: 1.2em; margin: .6rem 0; }
+  .tablewrap { overflow-x: auto; margin: .4rem 0 1.4rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+  th {
+    text-align: left; color: var(--dim); font-weight: normal; padding: .35rem .7rem;
+    border-bottom: 1px solid var(--line); white-space: nowrap;
   }
-  .cat:hover { border-color: var(--accent); }
-  .cat.open { border-color: var(--accent); }
-  .cat b { color: var(--accent); }
-  .cat small { color: var(--dim); display: block; margin-top: .15rem; }
-  .fx { display: flex; flex-wrap: wrap; gap: .35rem; margin: .8rem 0 1.4rem; }
-  .fx button { font-size: .78rem; padding: .3rem .55rem; }
-  .fx button.playing { border-color: var(--hot); color: var(--hot); }
-  .fx button small { color: var(--dim); }
-  #status { color: var(--dim); font-size: .8rem; min-height: 1.2em; margin: .4rem 0; }
-  footer { max-width: 64rem; margin: 2rem auto 0; color: var(--dim); font-size: .8rem; }
+  td { padding: .32rem .7rem; border-bottom: 1px solid #2a2340; vertical-align: top; }
+  tbody tr { cursor: pointer; }
+  tbody tr:nth-child(odd) { background: #1b1529; }
+  tbody tr:hover td { background: #2a2145; }
+  tbody tr.playing td { color: var(--hot); }
+  td.name { white-space: nowrap; color: var(--accent); }
+  td.dur { white-space: nowrap; color: var(--dim); text-align: right; }
+  td.desc { color: var(--ink); }
+  td .play { border: none; background: none; color: var(--accent2); cursor: pointer;
+             padding: 0 .3rem 0 0; font: inherit; }
+  .note { color: var(--dim); font-size: .8rem; margin: .4rem 0 1rem; }
+  footer { margin-top: 2rem; color: var(--dim); font-size: .8rem; }
   footer code { color: var(--accent2); }
 </style>
 </head>
@@ -53,7 +60,7 @@
   <h1>8bit-sfx <span class="v" id="version"></span></h1>
   <p id="summary">loading manifest…</p>
   <p>free 8-bit sound effects — <a href="https://github.com/cportka/8bit-sfx">github.com/cportka/8bit-sfx</a>
-     · <code>npm install 8bit-sfx</code> · click anything to play</p>
+     · <code>npm install 8bit-sfx</code> · pick a category or search, click a row to play</p>
 </header>
 <main>
   <div class="bar">
@@ -61,14 +68,15 @@
     <button id="rand">🎲 random</button>
     <button id="stop">■ stop</button>
   </div>
-  <div id="status"></div>
   <div class="cats" id="cats"></div>
-  <div class="fx" id="fx"></div>
+  <div id="status"></div>
+  <div class="tablewrap" id="tablewrap"></div>
 </main>
 <footer>
   <p>Every effect is deterministic — regenerate byte-for-byte with
-     <code>python3 scripts/generate_sfx.py</code>. Hover any effect for its description.
-     The <code>rpg</code> category includes the complete ported sound set of
+     <code>python3 scripts/generate_sfx.py</code>. Descriptions are derived from each
+     effect's actual synthesis parameters. The <code>rpg</code> category includes the
+     complete ported sound set of
      <a href="https://github.com/cportka/pixel-rpg">pixel-rpg</a>.</p>
 </footer>
 <script>
@@ -91,7 +99,7 @@
 
   let current = null;
   let openCat = null;
-  const play = (e, btn) => {
+  const play = (e, row) => {
     if (current) current.pause();
     current = new Audio('sfx/' + e.file);
     current.play().catch((err) => {
@@ -99,31 +107,56 @@
     });
     $('status').textContent = `▶ ${e.file} (${e.duration_s}s)` +
       (e.description ? ` — ${e.description}` : '');
-    document.querySelectorAll('.fx button.playing').forEach((b) => b.classList.remove('playing'));
-    if (btn) {
-      btn.classList.add('playing');
-      current.addEventListener('ended', () => btn.classList.remove('playing'));
+    document.querySelectorAll('tr.playing').forEach((r) => r.classList.remove('playing'));
+    if (row) {
+      row.classList.add('playing');
+      current.addEventListener('ended', () => row.classList.remove('playing'));
     }
   };
 
-  const renderFx = (list) => {
-    const box = $('fx');
-    box.textContent = '';
-    for (const e of list.slice(0, 400)) {
-      const b = document.createElement('button');
-      const name = e.file.split('/').pop().replace('.wav', '');
-      if (e.description) b.title = e.description;
-      b.append(name + ' ');
-      const small = document.createElement('small');
-      small.textContent = e.duration_s + 's';
-      b.appendChild(small);
-      b.addEventListener('click', () => play(e, b));
-      box.appendChild(b);
+  const renderTable = (list) => {
+    const wrap = $('tablewrap');
+    wrap.textContent = '';
+    if (!list.length) return;
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    for (const h of ['', 'effect', 'description', 'duration']) {
+      const th = document.createElement('th');
+      th.textContent = h;
+      hr.appendChild(th);
     }
-    if (list.length > 400) {
-      const note = document.createElement('span');
-      note.textContent = ` …${list.length - 400} more (narrow the search)`;
-      box.appendChild(note);
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    for (const e of list.slice(0, 500)) {
+      const tr = document.createElement('tr');
+      const tdPlay = document.createElement('td');
+      const btn = document.createElement('button');
+      btn.className = 'play';
+      btn.textContent = '▶';
+      btn.setAttribute('aria-label', 'play');
+      tdPlay.appendChild(btn);
+      const tdName = document.createElement('td');
+      tdName.className = 'name';
+      tdName.textContent = e.file.split('/').pop().replace('.wav', '');
+      const tdDesc = document.createElement('td');
+      tdDesc.className = 'desc';
+      tdDesc.textContent = e.description || '';
+      const tdDur = document.createElement('td');
+      tdDur.className = 'dur';
+      tdDur.textContent = e.duration_s + 's';
+      tr.append(tdPlay, tdName, tdDesc, tdDur);
+      tr.addEventListener('click', () => play(e, tr));
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    if (list.length > 500) {
+      const note = document.createElement('p');
+      note.className = 'note';
+      note.textContent = `showing 500 of ${list.length} — narrow the search`;
+      wrap.appendChild(note);
     }
   };
 
@@ -131,21 +164,16 @@
     const box = $('cats');
     box.textContent = '';
     for (const c of cats) {
-      const list = effects.filter((e) => e.category === c);
-      const d = document.createElement('div');
-      d.className = 'cat' + (openCat === c ? ' open' : '');
-      const label = document.createElement('b');
-      label.textContent = c;
-      const small = document.createElement('small');
-      small.textContent = `${list.length} effects — click to browse (a random sample plays on open)`;
-      d.append(label, ' ', small);
-      d.addEventListener('click', () => {
+      const b = document.createElement('button');
+      b.textContent = c;
+      if (openCat === c) b.classList.add('open');
+      b.addEventListener('click', () => {
         openCat = openCat === c ? null : c;
+        $('q').value = '';
         renderCats();
-        renderFx(openCat ? list : []);
-        if (openCat) play(list[Math.floor(Math.random() * list.length)]);
+        renderTable(openCat ? effects.filter((e) => e.category === openCat) : []);
       });
-      box.appendChild(d);
+      box.appendChild(b);
     }
   };
 
@@ -153,7 +181,7 @@
     const q = $('q').value.trim().toLowerCase();
     openCat = null;
     renderCats();
-    renderFx(q ? effects.filter((e) =>
+    renderTable(q ? effects.filter((e) =>
       e.file.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q)) : []);
   });
   $('rand').addEventListener('click', () => {
@@ -162,7 +190,7 @@
   $('stop').addEventListener('click', () => {
     if (current) current.pause();
     $('status').textContent = '';
-    document.querySelectorAll('.fx button.playing').forEach((b) => b.classList.remove('playing'));
+    document.querySelectorAll('tr.playing').forEach((r) => r.classList.remove('playing'));
   });
 
   renderCats();

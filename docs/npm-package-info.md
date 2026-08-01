@@ -45,13 +45,35 @@ release step reserved for the owner:
 git checkout main && git pull            # publish exactly what was merged
 npm test                                 # belt and braces
 npm login                                # first time on this machine (account: your npm user)
-npm publish                              # add --otp=XXXXXX if 2FA is enabled (it should be)
+npm publish --otp=XXXXXX                 # XXXXXX = the 6-digit code from your authenticator app
 ```
+
+### If you get `E403 … Two-factor authentication or granular access token with bypass 2fa enabled is required`
+
+That error is npm's registry policy, not a problem with the package: **npm refuses
+publishes from accounts without 2FA** (and from legacy/classic tokens). Two ways out —
+do ONE of them:
+
+1. **Enable 2FA on the account** (the recommended path):
+   - <https://www.npmjs.com/settings/~/security> (npmjs.com → avatar → *Account
+     Settings* → *Two-Factor Authentication*) → enable **Authorization and Publishing**
+     with an authenticator app (or a passkey).
+   - Then re-run `npm login` (the browser flow picks up the 2FA) and publish with the
+     current 6-digit code: `npm publish --otp=123456`. Without `--otp`, npm may prompt
+     for the code or open a browser confirmation — either is fine.
+2. **Granular access token with 2FA bypass** (for CI/automation): npmjs.com → *Access
+   Tokens* → *Generate New Token* → **Granular Access Token**, scope it to the
+   `8bit-sfx` package with *Read and write* permission, and check **Bypass two-factor
+   authentication**. Then publish with it:
+   `NPM_CONFIG_//registry.npmjs.org/:_authToken=npm_XXXX npm publish`
+   (or put the token in `~/.npmrc` as `//registry.npmjs.org/:_authToken=npm_XXXX`).
+   Treat the token like a password; prefer option 1 for publishes from your laptop.
 
 - The **first** publish claims the free name and creates the package page; add
   `--access public` explicitly if npm prompts (unscoped packages default to public).
 - npm rejects re-publishing an existing version — the version bump in step 2 of the
-  update loop is what makes `npm publish` possible.
+  update loop is what makes `npm publish` possible. A publish that died with E403 did
+  NOT consume the version; re-running with 2FA sorted will work without a new bump.
 - After publishing, tag the release (`git tag v0.4.0 && git push origin v0.4.0`) and cut
   the GitHub Release from the web UI, per the standard.
 - Consider `npm publish --provenance` when publishing from GitHub Actions in the future;

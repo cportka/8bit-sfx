@@ -1,6 +1,6 @@
 {
  "name": "8bit-sfx",
- "version": "0.4.0",
+ "version": "0.4.1",
  "count": 2200,
  "sample_rate": 22050,
  "format": "8-bit unsigned PCM mono WAV",
