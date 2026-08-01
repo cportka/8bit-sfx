@@ -17,6 +17,18 @@ test('manifest loads and is internally consistent', async () => {
     assert.ok(e.file && e.category, `entry missing file/category: ${JSON.stringify(e)}`);
     assert.ok(e.duration_s > 0, `non-positive duration: ${e.file}`);
     assert.equal(e.sample_rate, SAMPLE_RATE);
+    assert.ok(e.description?.length >= 15, `missing/thin description: ${e.file}`);
+  }
+  // Descriptions exist to differentiate effects — near-duplicates defeat them.
+  const byCat = new Map();
+  for (const e of m.effects) {
+    if (!byCat.has(e.category)) byCat.set(e.category, []);
+    byCat.get(e.category).push(e.description);
+  }
+  for (const [cat, descs] of byCat) {
+    const unique = new Set(descs).size;
+    assert.ok(unique >= 0.8 * descs.length,
+      `${cat}: only ${unique}/${descs.length} unique descriptions`);
   }
 });
 
@@ -29,7 +41,7 @@ test('soundUrl resolves short names and paths to real files', async () => {
       assert.ok(existsSync(fileURLToPath(url)), `missing on disk: ${ref} -> ${url}`);
     }
   }
-  assert.ok(existsSync(fileURLToPath(soundUrl('pixelrpg_zombie'))), 'pixelrpg set resolvable');
+  assert.ok(existsSync(fileURLToPath(soundUrl('rpg_zombie'))), 'ported game set resolvable');
 });
 
 test('SfxPlayer is safe without an AudioContext', async () => {
