@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows Keep
 (https://keepachangelog.com) and the project uses Semantic Versioning (https://semver.org).
 Every change bumps the version and adds an entry below.
 
+## [0.4.0] - 2026-07-30
+
+### Added
+- **Per-effect catalog descriptions**: every generator now records its synthesis decisions
+  (`rng.tags`) and a per-category describer turns them into a short, distinctive
+  `description` field in the manifest — derived from the actual parameters (sub-style,
+  pitches, counts, textures), so users can pick sounds by reading instead of auditioning.
+  The 24 ported game sounds carry hand-written descriptions. Shown as tooltips and in the
+  playback status on the testing page, and searchable there.
+- **`person` category** (100 effects): human body foley — heartbeats, breathing, sneezes,
+  coughs, snores, yawns, gulps, chewing, claps, finger snaps, shivers, stomach growls —
+  distinct from `voice` (which stays vocal: babble, grunts, laughs, sighs).
+- **`rpg` category grown to 100**: 76 new RPG-mechanics staples (swords, bows, spell
+  casts, heals, potions, level-ups, quest stingers, loot jingles, chests, shields, traps,
+  teleports, game-over stings, save chimes) alongside the 24 ported game sounds.
+- `docs/npm-package-info.md`: the package's npm status (name free, not yet published) and
+  the update/publish playbook.
+
+### Changed
+- **Renamed the `pixelrpg` category to `rpg`** (files `rpg/rpg_<name>.wav`). Consumers
+  filtering on `category === 'pixelrpg'` must switch to `'rpg'`; the ported sounds'
+  `label` fields are unchanged. All other 0.3.0 categories are byte-identical.
+
 ## [0.3.0] - 2026-07-30
 
 ### Added

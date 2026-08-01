@@ -19,10 +19,21 @@ if manifest["count"] != len(manifest["effects"]):
     errs.append("manifest count field disagrees with its own entries")
 if len(files) != len(listed) or [f.removeprefix("sfx/") for f in files] != listed:
     errs.append("files on disk (%d) do not match manifest entries (%d)" % (len(files), len(listed)))
-if not 1950 <= len(files) <= 2150:
-    errs.append("expected ~2000+ effects, found %d" % len(files))
-if sum(1 for e in manifest["effects"] if e["category"] == "pixelrpg") != 24:
-    errs.append("pixelrpg ported set should have exactly 24 sounds")
+if not 2150 <= len(files) <= 2250:
+    errs.append("expected ~2200 effects, found %d" % len(files))
+rpg = [e for e in manifest["effects"] if e["category"] == "rpg"]
+if len(rpg) != 100:
+    errs.append("rpg category should have exactly 100 sounds, found %d" % len(rpg))
+if sum(1 for e in rpg if "label" in e) != 24:
+    errs.append("rpg should contain exactly the 24 ported (labeled) game sounds")
+no_desc = [e["file"] for e in manifest["effects"]
+           if len(e.get("description", "")) < 15]
+if no_desc:
+    errs.append("effects missing a substantive description, e.g. %s" % no_desc[:3])
+for cat in {e["category"] for e in manifest["effects"]}:
+    descs = [e["description"] for e in manifest["effects"] if e["category"] == cat]
+    if len(set(descs)) < 0.8 * len(descs):
+        errs.append("category %s: only %d/%d unique descriptions" % (cat, len(set(descs)), len(descs)))
 
 for f in files:
     try:
@@ -44,8 +55,10 @@ EOF
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 python3 scripts/generate_sfx.py --out "$tmp" \
-  --only jump_007 explosion_042 jingle_099 water_013 footstep_055 pixelrpg_zombie || exit 1
+  --only jump_007 explosion_042 jingle_099 water_013 footstep_055 \
+         person_010 rpg_042 rpg_zombie || exit 1
 for f in jump/jump_007 explosion/explosion_042 jingle/jingle_099 \
-         water/water_013 footstep/footstep_055 pixelrpg/pixelrpg_zombie; do
+         water/water_013 footstep/footstep_055 \
+         person/person_010 rpg/rpg_042 rpg/rpg_zombie; do
   cmp -s "sfx/$f.wav" "$tmp/$f.wav" || { echo "  generator drift: $f.wav" >&2; exit 1; }
 done

@@ -57,7 +57,7 @@
 </header>
 <main>
   <div class="bar">
-    <input type="search" id="q" placeholder="search effects… (e.g. dog_0, splash, menu)">
+    <input type="search" id="q" placeholder="search names & descriptions… (e.g. splash, heartbeat, sword)">
     <button id="rand">🎲 random</button>
     <button id="stop">■ stop</button>
   </div>
@@ -67,8 +67,9 @@
 </main>
 <footer>
   <p>Every effect is deterministic — regenerate byte-for-byte with
-     <code>python3 scripts/generate_sfx.py</code>. The <code>pixelrpg</code> category is the
-     complete ported sound set of <a href="https://github.com/cportka/pixel-rpg">pixel-rpg</a>.</p>
+     <code>python3 scripts/generate_sfx.py</code>. Hover any effect for its description.
+     The <code>rpg</code> category includes the complete ported sound set of
+     <a href="https://github.com/cportka/pixel-rpg">pixel-rpg</a>.</p>
 </footer>
 <script>
 (async () => {
@@ -96,7 +97,8 @@
     current.play().catch((err) => {
       if (err.name !== 'AbortError') $('status').textContent = `could not play ${e.file}: ${err.message}`;
     });
-    $('status').textContent = `▶ ${e.file} (${e.duration_s}s)`;
+    $('status').textContent = `▶ ${e.file} (${e.duration_s}s)` +
+      (e.description ? ` — ${e.description}` : '');
     document.querySelectorAll('.fx button.playing').forEach((b) => b.classList.remove('playing'));
     if (btn) {
       btn.classList.add('playing');
@@ -110,6 +112,7 @@
     for (const e of list.slice(0, 400)) {
       const b = document.createElement('button');
       const name = e.file.split('/').pop().replace('.wav', '');
+      if (e.description) b.title = e.description;
       b.append(name + ' ');
       const small = document.createElement('small');
       small.textContent = e.duration_s + 's';
@@ -150,7 +153,8 @@
     const q = $('q').value.trim().toLowerCase();
     openCat = null;
     renderCats();
-    renderFx(q ? effects.filter((e) => e.file.toLowerCase().includes(q)) : []);
+    renderFx(q ? effects.filter((e) =>
+      e.file.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q)) : []);
   });
   $('rand').addEventListener('click', () => {
     play(effects[Math.floor(Math.random() * effects.length)]);

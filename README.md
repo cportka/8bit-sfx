@@ -1,12 +1,14 @@
 # 8bit-sfx
 
-**Version:** 0.3.0
+**Version:** 0.4.0
 
-A free 8-bit sound effects library and npm package: **2000 generated effects** across 20
-categories plus the complete ported sound set of
-[pixel-rpg](https://github.com/cportka/pixel-rpg), all synthesized NES-style (square and
-triangle waves, 15-bit LFSR noise, 16-level amplitude quantization) as 8-bit unsigned
-mono WAV at 22050 Hz. MIT licensed — use them in anything.
+A free 8-bit sound effects library and npm package: **2200 effects** across 22 categories
+— including the complete ported sound set of
+[pixel-rpg](https://github.com/cportka/pixel-rpg) inside the `rpg` category — all
+synthesized NES-style (square and triangle waves, 15-bit LFSR noise, 16-level amplitude
+quantization) as 8-bit unsigned mono WAV at 22050 Hz. **Every effect carries a catalog
+description in the manifest** derived from its actual synthesis parameters, so you can
+find the sound you want by reading, not auditioning. MIT licensed — use them in anything.
 
 **Try them: <https://cportka.github.io/8bit-sfx/>** — a testing page (GitHub Pages, deployed
 from `main`) that browses every category and plays effects in the browser.
@@ -60,11 +62,13 @@ Raw files are also importable as `8bit-sfx/sfx/<category>/<name>.wav` and the ma
 | `fire` | 100 | crackles, ignition whooshes, torch flutters, sizzles |
 | `footstep` | 100 | single steps: grass, gravel, stone, wood, snow, mud |
 | `mech` | 100 | doors, chests, levers, switches, gates, winches |
-| `pixelrpg` | 24 | the complete [pixel-rpg](https://github.com/cportka/pixel-rpg) sound set, ported exactly |
+| `person` | 100 | human body foley: heartbeats, breaths, sneezes, claps, snores |
+| `rpg` | 100 | swords, spells, potions, level-ups, loot — plus the complete [pixel-rpg](https://github.com/cportka/pixel-rpg) sound set, ported exactly |
 
-Files live at `sfx/<category>/<category>_NNN.wav` (`NNN` = `000`–`099`; the `pixelrpg`
-set keeps its game event names, e.g. `pixelrpg_menu-open.wav`), indexed by
-[`sfx/manifest.json`](sfx/manifest.json) with per-effect duration and format metadata.
+Files live at `sfx/<category>/<category>_NNN.wav` (`NNN` = `000`–`099`; the 24 ported
+game sounds in `rpg` keep their event names, e.g. `rpg_menu-open.wav`), indexed by
+[`sfx/manifest.json`](sfx/manifest.json) with per-effect **description**, duration, and
+format metadata.
 
 ## Regenerating
 
@@ -76,7 +80,7 @@ npm run generate                                                # the whole libr
 python3 scripts/generate_sfx.py --out /tmp/x --only jump_007    # spot-check one effect
 ```
 
-Python 3 stdlib only — no dependencies. The `pixelrpg` set is rendered by an exact port
+Python 3 stdlib only — no dependencies. The ported game sounds in `rpg` are rendered by an exact port
 of that game's Web Audio engine semantics from its pure-data `SOUNDS` table. The test
 suite (`npm test`) verifies manifest/file agreement, WAV integrity, the JS API, and
 generator determinism; CI runs it on every push and PR.

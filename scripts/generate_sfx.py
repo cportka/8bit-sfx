@@ -109,11 +109,14 @@ def gen_jump(rng):
     f0 = rng.uniform(midi(55), midi(67))
     sweep = rng.uniform(2.0, 4.0)  # octaves-ish upward glide
     duty = rng.choice([0.125, 0.25, 0.5])
+    rate = rng.uniform(4.0, 9.0)
+    rng.tags = {"style": "jump", "duty": duty, "f0": int(round(f0)),
+                "sweep": round(sweep, 1), "snap": "snappy" if rate > 6.5 else "floaty"}
     return render_tone(
         int(dur * SR),
         lambda t: f0 * (2.0 ** (sweep * t / dur)),
         duty,
-        decay(rng.uniform(4.0, 9.0)),
+        decay(rate),
     )
 
 
@@ -124,7 +127,11 @@ def gen_coin(rng):
     jump_iv = rng.choice([3, 4, 5, 7])
     split = rng.uniform(0.2, 0.35)
     duty = rng.choice([0.25, 0.5])
-    env = decay(rng.uniform(5.0, 10.0))
+    rate = rng.uniform(5.0, 10.0)
+    env = decay(rate)
+    rng.tags = {"style": "coin", "duty": duty, "root_hz": int(round(midi(root))),
+                "interval": {3: "minor third", 4: "major third", 5: "fourth", 7: "fifth"}[jump_iv],
+                "split_pct": int(round(split * 100)), "fade": round(rate, 1)}
     freq = lambda t: midi(root) if t < dur * split else midi(root + jump_iv)
     return render_tone(n, freq, duty, env)
 
@@ -135,6 +142,8 @@ def gen_laser(rng):
     f1 = rng.uniform(midi(48), midi(64))
     duty = rng.choice([0.125, 0.25, 0.5])
     vib = rng.uniform(0.0, 30.0)
+    rng.tags = {"style": "laser", "duty": duty, "from_hz": int(round(f0)), "to_hz": int(round(f1)),
+                "wobble": "warbled" if vib > 15 else "clean"}
     return render_tone(
         int(dur * SR),
         lambda t: f0 * (f1 / f0) ** (t / dur) + vib * math.sin(60.0 * t),
@@ -149,6 +158,9 @@ def gen_explosion(rng):
     noise = Lfsr(rng, rng.randint(2, 8))
     rate = rng.uniform(2.5, 6.0)
     rumble = rng.uniform(0.0, 0.5)
+    rng.tags = {"style": "explosion", "grit": noise.period, "fade": round(rate, 1),
+                "tail": "long" if rate < 4.0 else "short",
+                "rumble_pct": int(round(rumble * 100))}
     out = []
     prev = 0.0
     for i in range(n):
@@ -174,6 +186,8 @@ def gen_powerup(rng):
     root = rng.randint(60, 72)
     scale = rng.choice([[0, 2, 4, 7, 9], [0, 3, 5, 7, 10], [0, 4, 7]])
     duty = rng.choice([0.25, 0.5])
+    rng.tags = {"style": "powerup", "duty": duty, "steps": steps, "root_hz": int(round(midi(root))),
+                "flavor": {5: "major-pentatonic", 3: "major-triad"}.get(len(scale), "minor-pentatonic")}
     seq = [midi(root + scale[i % len(scale)] + 12 * (i // len(scale))) for i in range(steps)]
     freq = lambda t: seq[min(int(t / dur * steps), steps - 1)]
     env = lambda t: min(1.0, 8.0 * (dur - t) / dur)
@@ -188,6 +202,8 @@ def gen_hit(rng):
     duty = rng.choice([0.25, 0.5])
     mix = rng.uniform(0.4, 0.7)
     env = decay(rng.uniform(15.0, 30.0))
+    rng.tags = {"style": "hit", "duty": duty, "thud_hz": int(round(f0)),
+                "balance": "noise-forward" if mix > 0.55 else "tone-forward"}
     out = []
     phase = 0.0
     for i in range(n):
@@ -202,7 +218,9 @@ def gen_blip(rng):
     dur = rng.uniform(0.04, 0.12)
     f = midi(rng.randint(72, 96))
     duty = rng.choice([0.125, 0.25, 0.5])
-    return render_tone(int(dur * SR), lambda t: f, duty, decay(rng.uniform(20.0, 40.0)))
+    rate = rng.uniform(20.0, 40.0)
+    rng.tags = {"style": "blip", "duty": duty, "hz": int(round(f)), "fade": int(round(rate))}
+    return render_tone(int(dur * SR), lambda t: f, duty, decay(rate))
 
 
 def gen_alarm(rng):
@@ -212,6 +230,9 @@ def gen_alarm(rng):
     fb = fa * rng.choice([1.26, 1.33, 1.5])
     cycle = rng.uniform(0.06, 0.15)
     duty = rng.choice([0.25, 0.5])
+    rng.tags = {"style": "alarm", "duty": duty, "low_hz": int(round(fa)), "high_hz": int(round(fb)),
+                "cycle_ms": int(round(cycle * 1000)),
+                "pace": "frantic" if cycle < 0.09 else "steady"}
     freq = lambda t: fa if int(t / cycle) % 2 == 0 else fb
     env = lambda t: 1.0 if t < dur * 0.8 else max(0.0, (dur - t) / (dur * 0.2))
     return render_tone(n, freq, duty, env)
@@ -224,6 +245,9 @@ def gen_drone(rng):
     wob_amt = rng.uniform(0.01, 0.06)
     duty = rng.choice([0.25, 0.5])
     wf = rng.choice([None, "tri"])
+    rng.tags = {"style": "drone", "wave": "triangle" if wf == "tri" else "square",
+                "hz": int(round(f0)), "wobble_hz": round(wob_rate, 1),
+                "depth": "seasick" if wob_amt > 0.035 else "gentle"}
     freq = lambda t: f0 * (1.0 + wob_amt * math.sin(2 * math.pi * wob_rate * t))
     env = lambda t: min(1.0, 12.0 * t / dur, 6.0 * (dur - t) / dur)
     return render_tone(int(dur * SR), freq, duty, env, wave_fn=wf)
@@ -238,6 +262,8 @@ def gen_jingle(rng):
     duty = rng.choice([0.25, 0.5])
     seq = [midi(root + rng.choice(scale)) for _ in range(notes - 1)]
     seq.append(midi(root + rng.choice([12, 16, 19])))  # end on a high resolve
+    rng.tags = {"style": "jingle", "duty": duty, "notes": notes, "root_hz": int(round(midi(root))),
+                "resolve_hz": int(round(seq[-1]))}
     step = dur / notes
     freq = lambda t: seq[min(int(t / step), notes - 1)]
     env = lambda t: math.exp(-3.0 * ((t % step) / step))
@@ -287,6 +313,12 @@ def gen_ambient(rng):
                           rng.uniform(0.25, 0.6),
                           rng.uniform(0.5, 1.0)))
         base = rng.uniform(0.15, 0.3)
+        rng.tags = {
+            "style": "wind",
+            "gusts": len(gusts),
+            "bed": "calm" if base < 0.22 else "steady",
+            "swell": "towering" if max(a for (_, _, a) in gusts) >= 0.8 else "gentle",
+        }
         lp = 0.0
         out = []
         for i in range(n):
@@ -308,9 +340,15 @@ def gen_ambient(rng):
         dur = rng.uniform(2.0, 3.0)
         n = int(SR * dur)
         out = [0.0] * n
-        for _ in range(rng.randint(2, 3)):
+        voices = rng.randint(2, 3)
+        lead_hz = None
+        lead_rate = None
+        for _ in range(voices):
             carrier = rng.uniform(2600.0, 4600.0)
             prate = rng.uniform(22.0, 42.0)
+            if lead_hz is None:
+                lead_hz = carrier
+                lead_rate = prate
             amp = rng.uniform(0.5, 1.0)
             t = rng.uniform(0.0, 0.5)
             while t < dur:
@@ -331,6 +369,12 @@ def gen_ambient(rng):
                         out[idx] += amp * math.sin(math.pi * k / m) * triangle(ph) * 0.5
                     pt += 1.0 / prate
                 t += clen + rng.uniform(0.3, 0.9)
+        rng.tags = {
+            "style": "crickets",
+            "voices": voices,
+            "lead_hz": int(round(lead_hz)),
+            "chirp": "rapid" if lead_rate >= 32.0 else "lazy",
+        }
         return finish(out, 40.0, 120.0)
 
     if style == "drips":
@@ -346,7 +390,8 @@ def gen_ambient(rng):
             lp += 0.01 * (rumble.next() - lp)
             out.append(lp * bed)
         delay = rng.uniform(0.16, 0.34)
-        for _ in range(rng.randint(2, 4)):
+        drops = rng.randint(2, 4)
+        for _ in range(drops):
             t0 = rng.uniform(0.05, dur * 0.55)
             f0 = rng.uniform(900.0, 2000.0)
             f1 = f0 * rng.uniform(0.35, 0.6)
@@ -364,6 +409,12 @@ def gen_ambient(rng):
                     env = min(1.0, u * 12.0) * (1.0 - u) * math.exp(-4.0 * u)
                     out[idx] += e_amp * env * triangle(ph) * 0.8
                 e_amp *= rng.uniform(0.45, 0.6)
+        rng.tags = {
+            "style": "drips",
+            "drops": drops,
+            "echo_ms": int(round(delay * 1000.0)),
+            "bed": "faint" if bed < 0.185 else "heavy",
+        }
         return finish(out, 30.0, 120.0)
 
     if style == "thunder":
@@ -371,7 +422,8 @@ def gen_ambient(rng):
         # swell-then-decay envelope undulated by two slow sines + a low throb
         dur = rng.uniform(2.0, 3.0)
         n = int(SR * dur)
-        noise = Lfsr(rng, rng.choice([3, 4, 6]))
+        per = rng.choice([3, 4, 6])
+        noise = Lfsr(rng, per)
         atk = rng.uniform(0.15, 0.5)
         u1f = rng.uniform(0.7, 2.0)
         u1p = rng.uniform(0.0, 6.283)
@@ -379,6 +431,12 @@ def gen_ambient(rng):
         u2p = rng.uniform(0.0, 6.283)
         subf = rng.uniform(28.0, 45.0)
         subamp = rng.uniform(0.15, 0.35)
+        rng.tags = {
+            "style": "thunder",
+            "attack": "sudden" if atk < 0.3 else "rolling",
+            "grain": "fine" if per == 3 else ("crunchy" if per == 4 else "coarse"),
+            "throb_hz": int(round(subf)),
+        }
         lp = 0.0
         lp2 = 0.0
         ph = 0.0
@@ -405,6 +463,12 @@ def gen_ambient(rng):
         bright = rng.uniform(0.25, 0.7)
         swf = rng.uniform(0.2, 0.7)
         swp = rng.uniform(0.0, 6.283)
+        rng.tags = {
+            "style": "rain",
+            "patter": "dense" if density >= 0.012 else "sparse",
+            "drops_sec": int(round(density * SR)),
+            "tone": "bright" if bright > 0.45 else "muffled",
+        }
         e = 0.0
         lp = 0.0
         out = []
@@ -437,7 +501,8 @@ def gen_ambient(rng):
         trem = 0.6 + 0.4 * math.sin(6.283185 * trem_f * t)
         out.append((triangle(ph1) + triangle(ph2)) * 0.4 * trem)
     steps = [0, 3, 5, 7, 10, 12, 15]
-    for _ in range(rng.randint(3, 8)):
+    sparkles = rng.randint(3, 8)
+    for _ in range(sparkles):
         t0 = rng.uniform(0.1, dur - 0.3)
         f = root * 4.0 * math.pow(2.0, rng.choice(steps) / 12.0)
         m = int(rng.uniform(0.06, 0.15) * SR)
@@ -451,6 +516,12 @@ def gen_ambient(rng):
             u = k / m
             ph += f / SR
             out[idx] += a * min(1.0, u * 10.0) * (1.0 - u) * square(ph, 0.125) * 0.5
+    rng.tags = {
+        "style": "shimmer",
+        "root_hz": int(round(root)),
+        "beat": "slow" if det < 0.7 else "quick",
+        "sparkles": sparkles,
+    }
     return finish(out, 100.0, 200.0)
 
 
@@ -461,6 +532,7 @@ def gen_ui(rng):
         ["click", "hover", "toggle", "ding", "error", "success", "type", "scroll"]
     )
     out = []
+    duty_word = {0.125: "reedy", 0.25: "nasal", 0.5: "hollow"}
 
     def tone(n, f0, f1, duty, rate, wav="sq"):
         # square/triangle tone, exponential pitch glide f0 -> f1, exp decay envelope
@@ -480,9 +552,15 @@ def gen_ui(rng):
         # mouse click: fast falling square chirp, optional 1.5 ms noise transient
         n = int(SR * rng.uniform(0.032, 0.055))
         f0 = rng.uniform(1100.0, 3200.0)
-        out = tone(n, f0, f0 * rng.uniform(0.3, 0.65),
-                   rng.choice([0.125, 0.25, 0.5]), rng.uniform(70.0, 130.0))
-        if rng.random() < 0.5:
+        fall = rng.uniform(0.3, 0.65)
+        duty = rng.choice([0.125, 0.25, 0.5])
+        rate = rng.uniform(70.0, 130.0)
+        out = tone(n, f0, f0 * fall, duty, rate)
+        noisy = rng.random() < 0.5
+        rng.tags = {"style": "click", "pitch_hz": round(f0),
+                    "tone": duty_word[duty],
+                    "attack": "noisy" if noisy else "clean"}
+        if noisy:
             lf = Lfsr(rng, 1)
             m = min(n, int(SR * 0.0015))
             for i in range(m):
@@ -492,18 +570,28 @@ def gen_ui(rng):
         # soft hover blip: triangle, slight upward glide, gentle decay
         n = int(SR * rng.uniform(0.04, 0.08))
         f0 = rng.uniform(550.0, 1400.0)
-        out = tone(n, f0, f0 * rng.uniform(1.05, 1.35), 0.5,
-                   rng.uniform(35.0, 60.0), "tri")
+        rise = rng.uniform(1.05, 1.35)
+        rate = rng.uniform(35.0, 60.0)
+        out = tone(n, f0, f0 * rise, 0.5, rate, "tri")
+        rng.tags = {"style": "hover", "pitch_hz": round(f0),
+                    "glide": "wide" if rise > 1.2 else "slight",
+                    "fade": "lingering" if rate < 47.5 else "quick"}
 
     elif style == "toggle":
         # switch on/off: two short notes, up = on, down = off, tiny gap between
         m = rng.randint(72, 86)
         step = rng.choice([3, 4, 5, 7])
-        seq = [m, m + step] if rng.random() < 0.5 else [m + step, m]
+        up = rng.random() < 0.5
+        seq = [m, m + step] if up else [m + step, m]
         ndur = rng.uniform(0.028, 0.045)
         duty = rng.choice([0.25, 0.5])
         wav = rng.choice(["sq", "sq", "tri"])
         rate = rng.uniform(45.0, 80.0)
+        rng.tags = {"style": "toggle",
+                    "direction": "up" if up else "down",
+                    "interval": step,
+                    "note_hz": round(midi(m)),
+                    "timbre": "triangle" if wav == "tri" else duty_word[duty] + " pulse"}
         for k, note in enumerate(seq):
             f = midi(note)
             out.extend(tone(int(SR * ndur), f, f, duty, rate, wav))
@@ -520,6 +608,10 @@ def gen_ui(rng):
         duty = rng.choice([0.25, 0.5])
         dc = 2.0 * duty - 1.0
         sparkle = rng.random() < 0.5
+        rng.tags = {"style": "ding", "pitch_hz": round(f),
+                    "beat_hz": round(det, 1),
+                    "timbre": "triangle" if wav == "tri" else duty_word[duty] + " pulse",
+                    "finish": "octave-sparkle" if sparkle else "pure"}
         ph1 = 0.0
         ph2 = 0.0
         for i in range(n):
@@ -544,6 +636,10 @@ def gen_ui(rng):
         nb = rng.choice([1, 1, 2])
         rate = rng.uniform(4.0, 9.0)
         drop = rng.uniform(0.75, 1.0)
+        rng.tags = {"style": "error", "buzz_hz": round(f),
+                    "bursts": nb,
+                    "tone": duty_word[duty],
+                    "droop": "sagging" if drop < 0.875 else "steady"}
         for b in range(nb):
             n = int(SR * (dur / nb) * (0.8 if nb == 2 else 1.0))
             ph = 0.0
@@ -566,6 +662,10 @@ def gen_ui(rng):
         ndur = min(rng.uniform(0.045, 0.07), 0.25 / len(pat))
         duty = rng.choice([0.125, 0.25, 0.5])
         wav = rng.choice(["sq", "sq", "tri"])
+        flavor = {4: "major", 3: "minor", 5: "quartal", 7: "open-fifth"}[pat[1]]
+        rng.tags = {"style": "success", "flavor": flavor,
+                    "notes": len(pat), "root_hz": round(midi(m)),
+                    "timbre": "triangle" if wav == "tri" else duty_word[duty] + " pulse"}
         for k, iv in enumerate(pat):
             f = midi(m + iv)
             last = k == len(pat) - 1
@@ -576,10 +676,18 @@ def gen_ui(rng):
     elif style == "type":
         # keyboard tick: bright LFSR burst with a fast decay, optional low thock
         n = int(SR * rng.uniform(0.032, 0.05))
-        lf = Lfsr(rng, rng.choice([1, 1, 2, 3]))
+        period = rng.choice([1, 1, 2, 3])
+        lf = Lfsr(rng, period)
         rate = rng.uniform(120.0, 260.0)
         thock = rng.random() < 0.6
         ft = rng.uniform(250.0, 700.0)
+        tags = {"style": "type",
+                "texture": {1: "bright", 2: "gritty", 3: "metallic"}[period],
+                "body": "thocky" if thock else "dry",
+                "decay_rate": round(rate)}
+        if thock:
+            tags["thock_hz"] = round(ft)
+        rng.tags = tags
         ph = 0.0
         for i in range(n):
             t = i / SR
@@ -594,12 +702,18 @@ def gen_ui(rng):
         n = int(SR * rng.uniform(0.032, 0.06))
         cf = rng.uniform(900.0, 2200.0)
         ratio = rng.uniform(1.1, 1.35)
-        if rng.random() < 0.5:
+        falling = rng.random() < 0.5
+        if falling:
             ratio = 1.0 / ratio
         steplen = max(1, int(SR * rng.uniform(0.004, 0.008)))
         duty = rng.choice([0.25, 0.5])
         dc = 2.0 * duty - 1.0
         rate = rng.uniform(40.0, 80.0)
+        rng.tags = {"style": "scroll",
+                    "direction": "falling" if falling else "rising",
+                    "start_hz": round(cf),
+                    "steps": n // steplen,
+                    "tone": duty_word[duty]}
         ph = 0.0
         for i in range(n):
             t = i / SR
@@ -673,6 +787,13 @@ def gen_voice(rng):
             env = lambda t, dur=dur: math.exp(-6.0 * t / dur) * min(1.0, t / 0.004)
             add(two_tone(n, fr, duty, env, det, wave), pos)
             pos += n + gap
+        rng.tags = {
+            "style": "babble",
+            "register": "high" if base >= 380.0 else "mid",
+            "pace": "rapid" if gap < 308 else "measured",
+            "syllables": n_syll,
+            "pitch_hz": round(base),
+        }
 
     elif style == "grunt":
         # Low pitch-drop with rough beating and a crunchy throat rasp.
@@ -694,6 +815,12 @@ def gen_voice(rng):
             t = i / SR
             rasp.append(lf.next() * 0.18 * math.exp(-14.0 * t / dur))
         add(rasp, 0)
+        rng.tags = {
+            "style": "grunt",
+            "register": "deep" if f0 < 104.0 else "low",
+            "texture": "rough" if det >= 1.035 else "gravelly",
+            "pitch_hz": round(f0),
+        }
 
     elif style == "hum":
         # Soft melodic hum: 1-3 held notes on beating triangles with slow vibrato.
@@ -715,6 +842,13 @@ def gen_voice(rng):
         atk = rng.uniform(0.03, 0.08)
         env = lambda t: min(1.0, t / atk) * min(1.0, max(0.0, dur - t) / 0.09)
         add(two_tone(n, fr, 0.5, env, det, "tri", amp=0.5), 0)
+        rng.tags = {
+            "style": "hum",
+            "register": "low" if notes[0] < 196.0 else ("mid" if notes[0] < 311.0 else "high"),
+            "vibrato": "subtle" if vdep < 0.012 else "wavering",
+            "notes": n_notes,
+            "pitch_hz": round(notes[0]),
+        }
 
     elif style == "laugh":
         # "Ha-ha-ha": descending run of pitch-drooping bursts, each with a breathy 'h' onset.
@@ -737,6 +871,13 @@ def gen_voice(rng):
             add(br, pos)
             pos += n + int(SR * rng.uniform(0.02, 0.05))
             f *= step
+        rng.tags = {
+            "style": "laugh",
+            "timbre": "reedy" if duty == 0.25 else "round",
+            "descent": "tumbling" if step < 0.962 else "even",
+            "bursts": n_ha,
+            "pitch_hz": round(base),
+        }
 
     elif style == "gasp":
         # Sharp inhale: noise whose sample-and-hold rate sweeps crunchy->bright, plus a rising airy tone.
@@ -760,6 +901,13 @@ def gen_voice(rng):
         fr = lambda t: f0 * (2.0 ** (rise * t / dur))
         env = lambda t: 0.6 * math.sin(math.pi * min(1.0, t / dur))
         add(two_tone(n, fr, 0.5, env, det, "tri", amp=0.35), 0)
+        rng.tags = {
+            "style": "gasp",
+            "attack": "quick" if dur < 0.2 else "drawn",
+            "register": "high" if f0 >= 415.0 else "mid",
+            "rise_oct": round(rise, 1),
+            "pitch_hz": round(f0),
+        }
 
     elif style == "sigh":
         # Long falling glide on beating triangles with slow vibrato and a breath layer.
@@ -780,6 +928,13 @@ def gen_voice(rng):
             t = i / SR
             br.append(lf.next() * 0.12 * min(1.0, t / atk) * (max(0.0, 1.0 - t / dur) ** 2))
         add(br, 0)
+        rng.tags = {
+            "style": "sigh",
+            "register": "low" if f0 < 311.0 else "high",
+            "vibrato": "steady" if vdep < 0.013 else "quavering",
+            "fall_oct": round(fall, 1),
+            "pitch_hz": round(f0),
+        }
 
     else:  # "hey" call
         # "he-EY!": fast pitch jump up, held with a droop, bright duty and strong beating.
@@ -799,6 +954,13 @@ def gen_voice(rng):
 
         env = lambda t: min(1.0, t / 0.005) * (1.0 if t < dur * 0.7 else max(0.0, 1.0 - (t - dur * 0.7) / (dur * 0.3)))
         add(two_tone(n, fr, duty, env, det, "sq", amp=0.45), 0)
+        rng.tags = {
+            "style": "hey",
+            "register": "low" if f0 < 311.0 else "high",
+            "timbre": "piercing" if duty == 0.125 else "brassy",
+            "jump_semi": round(12.0 * math.log2(jump)),
+            "pitch_hz": round(f0),
+        }
 
     # Declick tail, then normalize so the 16-level quantizer downstream gets a healthy signal.
     if not out:
@@ -913,6 +1075,8 @@ def gen_dog(rng):
                                  rng.uniform(0.9, 1.3)))
             if c < cnt - 1:
                 out.extend([0.0] * int(rng.uniform(0.06, 0.1) * SR))
+        tags = {"style": "bark_small", "pitch_hz": int(round(f0)), "barks": cnt,
+                "timbre": "reedy" if duty == 0.125 else "nasal"}
 
     elif style == "bark_big":
         cnt = rng.choice([1, 1, 1, 2])
@@ -924,6 +1088,8 @@ def gen_dog(rng):
                                  rng.uniform(0.75, 1.05)))
             if c < cnt - 1:
                 out.extend([0.0] * int(rng.uniform(0.08, 0.13) * SR))
+        tags = {"style": "bark_big", "pitch_hz": int(round(f0)), "barks": cnt,
+                "register": "cavernous" if f0 < 180 else "gruff"}
 
     elif style == "yip":
         cnt = rng.choice([1, 1, 2, 3])
@@ -936,6 +1102,9 @@ def gen_dog(rng):
                                 rng.uniform(0.25, 0.4)))
             if c < cnt - 1:
                 out.extend([0.0] * int(rng.uniform(0.04, 0.07) * SR))
+        tags = {"style": "yip", "pitch_hz": int(round(flo)), "yips": cnt,
+                "sweep": "wide" if ratio > 1.65 else "narrow",
+                "timbre": "reedy" if duty == 0.125 else "nasal"}
 
     elif style == "whine":
         dur = rng.uniform(0.35, 0.75)
@@ -955,6 +1124,10 @@ def gen_dog(rng):
             ph += f / SR
             a = min(1.0, tn / 0.18) * min(1.0, (1.0 - tn) / 0.35)
             out[i] = (triangle(ph) if wav == "tri" else pulse(ph, 0.25)) * a
+        tags = {"style": "whine", "pitch_hz": int(round(f0)),
+                "voice": "smooth" if wav == "tri" else "buzzy",
+                "arc": "steep" if bend > 0.3 else "gentle",
+                "vibrato": "fluttery" if vd > 0.03 else "subtle"}
 
     elif style == "whimper":
         cnt = rng.randint(2, 4)
@@ -965,6 +1138,8 @@ def gen_dog(rng):
             out.extend(whimper_syll(rng.uniform(0.08, 0.13), fh, fh * drop))
             if c < cnt - 1:
                 out.extend([0.0] * int(rng.uniform(0.03, 0.07) * SR))
+        tags = {"style": "whimper", "pitch_hz": int(round(fhi)), "sobs": cnt,
+                "fall": "steep" if drop < 0.65 else "shallow"}
 
     elif style == "growl":
         dur = rng.uniform(0.4, 0.85)
@@ -989,6 +1164,9 @@ def gen_dog(rng):
             trem = 1.0 - td * (0.5 + 0.5 * math.sin(2.0 * math.pi * thz * t))
             a = min(1.0, tn / 0.12) * min(1.0, (1.0 - tn) / 0.18)
             out[i] = (pulse(ph, duty) * 0.85 + lf.next() * namp) * trem * a
+        tags = {"style": "growl", "pitch_hz": int(round(f0)),
+                "texture": "ragged" if rough > 0.25 else "coarse",
+                "tremolo": "fast" if thz > 16.0 else "slow"}
 
     elif style == "pant":
         nb = rng.randint(3, 5)
@@ -1004,6 +1182,8 @@ def gen_dog(rng):
                 out.append(y * amp * math.sin(math.pi * (i + 1.0) / bn))
             if b < nb - 1:
                 out.extend([0.0] * int(rng.uniform(0.04, 0.07) * SR))
+        tags = {"style": "pant", "breaths": nb,
+                "tone": "airy" if k_in > 0.32 else "muffled"}
 
     else:  # howl
         dur = rng.uniform(0.55, 0.88)
@@ -1036,7 +1216,12 @@ def gen_dog(rng):
             else:
                 s = square(ph1, 0.5) + (square(ph2, 0.5) * 0.6 if det else 0.0)
             out[i] = s * a * (0.62 if det else 1.0)
+        tags = {"style": "howl", "start_hz": int(round(f0)),
+                "sweep_oct": round(math.log2(ratio), 1),
+                "voice": "mellow" if wav == "tri" else "brassy",
+                "chorus": "detuned" if det else "single"}
 
+    rng.tags = tags
     return norm(endfade(out), target)
 
 
@@ -1095,6 +1280,13 @@ def gen_zombie(rng):
             env *= 1.0 - 0.25 * (0.5 + 0.5 * math.sin(TWO_PI * trem_r * t))
             nz += (noise.next() - nz) * 0.25
             buf.append(env * (zsq(ph, duty) + ngain * nz))
+        rng.tags = {
+            'style': 'groan',
+            'voice': 'nasal' if duty == 0.25 else 'hollow',
+            'breathiness': 'breathy' if ngain >= 0.085 else 'dry',
+            'pitch_hz': round(base),
+            'sag_pct': round(sag * 100),
+        }
         return finish(buf, rng.uniform(0.55, 0.85))
 
     if style == "moan":
@@ -1123,6 +1315,13 @@ def gen_zombie(rng):
             nz += (noise.next() - nz) * 0.3
             v = triangle(ph) if use_tri else zsq(ph, duty)
             buf.append(env * (v + ngain * nz))
+        rng.tags = {
+            'style': 'moan',
+            'voice': 'soft triangle' if use_tri else 'buzzy pulse',
+            'rise': 'wide' if arc >= 0.6 else 'gentle',
+            'vibrato': 'quick' if vib_r >= 5.75 else 'slow',
+            'pitch_hz': round(base),
+        }
         return finish(buf, rng.uniform(0.55, 0.85))
 
     if style == "hiss":
@@ -1149,6 +1348,13 @@ def gen_zombie(rng):
                     env = e2
             env *= 1.0 - flut_d * (0.5 + 0.5 * math.sin(TWO_PI * flut_r * t + 1.7))
             buf.append(env * y)
+        rng.tags = {
+            'style': 'hiss',
+            'tone': 'bright' if lp >= 0.65 else 'muffled',
+            'attack': 'sharp' if atk < 0.03 else 'soft',
+            'puffs': 2 if puff2 else 1,
+            'flutter_hz': round(flut_r),
+        }
         return finish(buf, rng.uniform(0.5, 0.75))
 
     if style == "gurgle":
@@ -1190,6 +1396,12 @@ def gen_zombie(rng):
             env = math.sin(math.pi * x) ** 0.6
             wob = 1.0 + 0.3 * math.sin(TWO_PI * wr * t)
             buf.append(env * (tone + cgain * y * wob + drone_g * triangle(dph)))
+        rng.tags = {
+            'style': 'gurgle',
+            'texture': 'thick' if cgain >= 0.35 else 'light',
+            'underlay': 'droning' if drone_g >= 0.15 else 'dry',
+            'wobble_hz': round(wr),
+        }
         return finish(buf, rng.uniform(0.55, 0.8))
 
     if style == "rattle":
@@ -1219,6 +1431,13 @@ def gen_zombie(rng):
             y += (noise.next() - y) * 0.6
             tph += tone_f / SR
             buf.append(env * g * (y + tone_g * triangle(tph)))
+        rng.tags = {
+            'style': 'rattle',
+            'gate': 'choppy' if gduty < 0.4 else 'loose',
+            'pace': 'slowing' if rate1 < rate0 else 'steady',
+            'undertone': 'humming' if tone_g >= 0.12 else 'plain',
+            'rattle_hz': round(rate0),
+        }
         return finish(buf, rng.uniform(0.5, 0.8))
 
     if style == "duet":
@@ -1244,6 +1463,13 @@ def gen_zombie(rng):
             env = (t / atk) if t < atk else math.exp(-1.8 * (t - atk) / dur)
             env *= 1.0 - 0.2 * (0.5 + 0.5 * math.sin(TWO_PI * trem_r * t))
             buf.append(env * (0.6 * zsq(ph1, duty1) + 0.5 * zsq(ph2, duty2)))
+        rng.tags = {
+            'style': 'duet',
+            'timbre': 'thin' if duty2 == 0.125 else 'full',
+            'glide': 'sliding' if glide >= 0.15 else 'steady',
+            'detune_cents': round(1200.0 * math.log2(det)),
+            'pitch_hz': round(base),
+        }
         return finish(buf, rng.uniform(0.55, 0.85))
 
     # snarl: short aggressive bark, fast throat-rate FM rasp plus noise, pitch drops
@@ -1268,6 +1494,13 @@ def gen_zombie(rng):
         env = (t / atk) if t < atk else math.exp(-3.0 * (t - atk) / dur)
         y += (noise.next() - y) * 0.5
         buf.append(env * (zsq(ph, duty) + ngain * y * env))
+    rng.tags = {
+        'style': 'snarl',
+        'bite': 'gritty' if ngain >= 0.25 else 'clean',
+        'drop': 'plunging' if drop >= 0.35 else 'slight',
+        'rasp_hz': round(rasp_r),
+        'pitch_hz': round(base),
+    }
     return finish(buf, rng.uniform(0.6, 0.85))
 
 
@@ -1309,6 +1542,10 @@ def gen_monster(rng):
         bamt = rng.uniform(0.15, 0.3)
         atk = max(1, sec(rng.uniform(0.03, 0.09)))
         rel = max(1, sec(rng.uniform(0.18, 0.35)))
+        rng.tags = {"style": "roar", "base_hz": int(round(base)),
+                    "growl_hz": int(round(growl_hz)),
+                    "growl": "heavy" if growl_amt > 0.38 else "light",
+                    "sag": "winded" if sag > 0.32 else "steady"}
         p1 = p2 = 0.0
         for i in range(n):
             t = i / SR
@@ -1337,6 +1574,10 @@ def gen_monster(rng):
         hamt = rng.uniform(0.08, 0.22)
         atk = max(1, sec(0.012))
         rel = max(1, sec(rng.uniform(0.08, 0.2)))
+        rng.tags = {"style": "screech", "base_hz": int(round(base)),
+                    "wobble": "wild" if wob_amt > 0.19 else "tight",
+                    "contour": "breaking" if breaks else "unbroken",
+                    **({"alt_hz": int(round(alt))} if breaks else {})}
         ph = 0.0
         for i in range(n):
             t = i / SR
@@ -1361,6 +1602,10 @@ def gen_monster(rng):
         rise = 0.5 if rng.random() < 0.35 else 0.0
         atk = max(1, sec(rng.uniform(0.015, 0.05)))
         rel = max(1, sec(rng.uniform(0.08, 0.22)))
+        rng.tags = {"style": "snarl", "base_hz": int(round(base)),
+                    "flutter": "wide" if spread > 0.23 else "narrow",
+                    "gate": "heavy" if camt > 0.42 else "light",
+                    "contour": "rising" if rise else "flat"}
         ph = 0.0
         f = base
         for i in range(n):
@@ -1380,6 +1625,10 @@ def gen_monster(rng):
         wv = rng.choice(["sq", "tri"])
         base_m = rng.randint(76, 95)
         drift = rng.choice([-4, -2, 0, 0, 2])
+        rng.tags = {"style": "chitter", "blips": nb,
+                    "base_hz": int(round(midi(base_m))),
+                    "wave": "triangle" if wv == "tri" else "thin square",
+                    "drift": {-4: "diving", -2: "sagging", 0: "level", 2: "rising"}[drift]}
         pos = 0
         for b in range(nb):
             bl = max(8, int(sec(period) * rng.uniform(0.3, 0.55)))
@@ -1412,6 +1661,10 @@ def gen_monster(rng):
             crunch = Lfsr(rng, rng.randint(10, 22))
             cramt = rng.uniform(0.3, 0.6)
             cdec = rng.uniform(25.0, 60.0)
+            if s == 0:
+                rng.tags = {"style": "stomp", "hits": 2 if double else 1,
+                            "from_hz": int(round(f_hi)), "to_hz": int(round(f_lo)),
+                            "debris": "gravelly" if cramt > 0.45 else "dusty"}
             ph = 0.0
             st = []
             for i in range(m):
@@ -1431,6 +1684,10 @@ def gen_monster(rng):
             nf += 1
         sub_amt = rng.uniform(0.15, 0.35)
         sub_f0 = rng.uniform(45.0, 75.0)
+        rng.tags = {"style": "flap", "beats": nf,
+                    "pace": "frantic" if rate < 0.22 else "lumbering",
+                    "thrum_hz": int(round(sub_f0)),
+                    "undertone": "strong" if sub_amt > 0.25 else "faint"}
         pos = 0
         for w in range(nf):
             flen = max(1, sec(rate * rng.uniform(0.85, 1.08)))
@@ -1476,7 +1733,12 @@ def gen_monster(rng):
             low += coef * (goo.next() - low)
             v = triangle(ph) * (1.0 - 0.4 * u) + gamt * low + samt * splat.next() * math.exp(-sdec * t)
             buf.append(v * min(1.0, i / atk, (n - i) / rel))
-        for b in range(rng.randint(2, 5)):
+        nbub = rng.randint(2, 5)
+        rng.tags = {"style": "squelch", "base_hz": int(round(base)),
+                    "wobble": "seasick" if wob_amt > 0.32 else "gentle",
+                    "splat": "wet" if samt > 0.6 else "soft",
+                    "bubbles": nbub}
+        for b in range(nbub):
             bl = max(8, sec(rng.uniform(0.03, 0.07)))
             start = rng.randint(sec(0.05), max(sec(0.05) + 1, n - bl - 1))
             bf = rng.uniform(180.0, 480.0)
@@ -1572,7 +1834,8 @@ def gen_water(rng):
         d = rng.uniform(0.06, 0.11)
         mix_at(0, wash(rng.uniform(0.008, 0.02), 1, 0.6, 90.0, 0.5))
         mix_at(int(0.004 * SR), droplet(d, f0, f1, 1.0))
-        if rng.random() < 0.55:
+        echo = rng.random() < 0.55
+        if echo:
             gap = rng.uniform(0.07, 0.16)
             mix_at(
                 int((0.004 + d + gap) * SR),
@@ -1584,30 +1847,23 @@ def gen_water(rng):
                 ),
             )
         pad_to(int(rng.uniform(0.18, 0.4) * SR))
+        tags = {"style": "drip", "plip_hz": int(round(f0)),
+                "rise": round(f1 / f0, 1),
+                "echo": "echoing" if echo else "single"}
 
     elif style == "small_splash":
         # bright short wash + low thunk + a couple of spray droplets
         d = rng.uniform(0.18, 0.32)
-        mix_at(
-            0,
-            wash(
-                d,
-                rng.choice([1, 1, 2]),
-                rng.uniform(0.25, 0.45),
-                rng.uniform(14.0, 22.0),
-                1.0,
-            ),
-        )
-        mix_at(
-            0,
-            droplet(
-                rng.uniform(0.05, 0.09),
-                rng.uniform(180.0, 320.0),
-                rng.uniform(90.0, 150.0),
-                0.7,
-            ),
-        )
-        for _ in range(rng.randint(1, 3)):
+        wper = rng.choice([1, 1, 2])
+        wlp = rng.uniform(0.25, 0.45)
+        wrate = rng.uniform(14.0, 22.0)
+        mix_at(0, wash(d, wper, wlp, wrate, 1.0))
+        td = rng.uniform(0.05, 0.09)
+        tf0 = rng.uniform(180.0, 320.0)
+        tf1 = rng.uniform(90.0, 150.0)
+        mix_at(0, droplet(td, tf0, tf1, 0.7))
+        sprays = rng.randint(1, 3)
+        for _ in range(sprays):
             pos = int(rng.uniform(0.35, 0.9) * d * SR)
             fd = rng.uniform(500.0, 1100.0)
             mix_at(
@@ -1620,19 +1876,17 @@ def gen_water(rng):
                 ),
             )
         pad_to(int((d + 0.05) * SR))
+        tags = {"style": "small_splash", "thunk_hz": int(round(tf0)),
+                "sprays": sprays,
+                "texture": "bright" if wlp > 0.35 else "soft"}
 
     elif style == "big_splash":
         # body thump + long churning wash + secondary slosh + rain-back drops
         d = rng.uniform(0.55, 1.0)
-        mix_at(
-            0,
-            droplet(
-                rng.uniform(0.08, 0.14),
-                rng.uniform(110.0, 200.0),
-                rng.uniform(45.0, 75.0),
-                0.9,
-            ),
-        )
+        td = rng.uniform(0.08, 0.14)
+        tf0 = rng.uniform(110.0, 200.0)
+        tf1 = rng.uniform(45.0, 75.0)
+        mix_at(0, droplet(td, tf0, tf1, 0.9))
         mix_at(
             0,
             wash(
@@ -1644,7 +1898,8 @@ def gen_water(rng):
                 gurgle=0.5,
             ),
         )
-        if rng.random() < 0.7:
+        slosh = rng.random() < 0.7
+        if slosh:
             mix_at(
                 int(rng.uniform(0.3, 0.5) * d * SR),
                 wash(
@@ -1655,7 +1910,8 @@ def gen_water(rng):
                     0.5,
                 ),
             )
-        for _ in range(rng.randint(2, 5)):
+        drops = rng.randint(2, 5)
+        for _ in range(drops):
             pos = int(rng.uniform(0.25, 0.85) * d * SR)
             fd = rng.uniform(400.0, 1000.0)
             mix_at(
@@ -1668,6 +1924,9 @@ def gen_water(rng):
                 ),
             )
         pad_to(int((d + 0.08) * SR))
+        tags = {"style": "big_splash", "thump_hz": int(round(tf0)),
+                "drops": drops,
+                "slosh": "double slosh" if slosh else "single hit"}
 
     elif style == "pour":
         # sustained gurgling noise column with glug-bubbles riding on top
@@ -1693,6 +1952,7 @@ def gen_water(rng):
             env *= 0.8 + 0.2 * math.sin(2.0 * math.pi * wobf * t)
             body.append(y * env * g)
         mix_at(0, body)
+        glugs = 0
         t = rng.uniform(0.1, 0.3)
         while t < d - 0.15:
             fb = rng.uniform(350.0, 900.0)
@@ -1705,13 +1965,18 @@ def gen_water(rng):
                     rng.uniform(0.2, 0.5),
                 ),
             )
+            glugs += 1
             t += rng.uniform(0.06, 0.2)
+        tags = {"style": "pour", "glugs": glugs,
+                "body": "hissy" if lp > 0.18 else "muffled",
+                "wobble_hz": round(wobf, 1)}
 
     elif style == "stream":
         # soft crunchy noise bed under many little rising (or sinking) bloops
         d = rng.uniform(1.2, 1.9)
         n = int(d * SR)
-        noise = Lfsr(rng, rng.choice([2, 3, 4]))
+        per = rng.choice([2, 3, 4])
+        noise = Lfsr(rng, per)
         lp = rng.uniform(0.08, 0.16)
         wobf = rng.uniform(0.7, 1.8)
         y = 0.0
@@ -1723,7 +1988,8 @@ def gen_water(rng):
             env *= 0.8 + 0.2 * math.sin(2.0 * math.pi * wobf * t + 1.0)
             bed.append(y * env * 0.5)
         mix_at(0, bed)
-        for _ in range(rng.randint(7, 14)):
+        bloops = rng.randint(7, 14)
+        for _ in range(bloops):
             pos = rng.uniform(0.05, d - 0.15)
             fb = rng.uniform(220.0, 850.0)
             if rng.random() < 0.75:
@@ -1740,6 +2006,9 @@ def gen_water(rng):
                     wob=rng.uniform(0.0, 0.05),
                 ),
             )
+        tags = {"style": "stream", "bloops": bloops,
+                "bed": {2: "fine", 3: "grainy", 4: "crunchy"}[per],
+                "sway_hz": round(wobf, 1)}
 
     elif style == "dive":
         # falling whistle (DC-compensated square) into a churning impact wash
@@ -1780,7 +2049,8 @@ def gen_water(rng):
                 0.8,
             ),
         )
-        for _ in range(rng.randint(1, 3)):
+        drops = rng.randint(1, 3)
+        for _ in range(drops):
             pos = splash_at + int(rng.uniform(0.2, 0.7) * sd * SR)
             fd = rng.uniform(450.0, 1000.0)
             mix_at(
@@ -1793,6 +2063,9 @@ def gen_water(rng):
                 ),
             )
         pad_to(len(buf) + int(0.04 * SR))
+        tags = {"style": "dive", "whistle_hz": int(round(f0)),
+                "duty": "thin" if duty == 0.25 else "full",
+                "drops": drops}
 
     else:  # blub — slow wobbly low glubs, optionally over a muffled deep bed
         nblubs = rng.randint(3, 6)
@@ -1812,10 +2085,15 @@ def gen_water(rng):
                 ),
             )
             t += bd + rng.uniform(0.06, 0.18)
-        if rng.random() < 0.6:
+        bedded = rng.random() < 0.6
+        if bedded:
             bed_d = t + 0.03
             mix_at(0, wash(bed_d, rng.randint(6, 10), 0.25, 1.5 / bed_d, 0.18, gurgle=0.6))
         pad_to(int((t + 0.05) * SR))
+        tags = {"style": "blub", "blubs": nblubs, "base_hz": int(round(base)),
+                "bed": "bedded" if bedded else "dry"}
+
+    rng.tags = tags
 
     # --- post: hand-rolled DC blocker, edge fades, peak normalize ---------
     n = len(buf)
@@ -1897,9 +2175,16 @@ def gen_fire(rng):
         for i in range(n):
             y += a * (lf.next() - y)
             buf[i] = y * fl[i] * 0.9
-        for _ in range(rng.randint(int(dur * 3), int(dur * 9))):
+        npops = rng.randint(int(dur * 3), int(dur * 9))
+        for _ in range(npops):
             pos = rng.randint(0, n - int(0.03 * SR) - 1)
             add_pop(buf, pos, rng.uniform(0.35, 1.0))
+        tags = {
+            'style': 'campfire',
+            'texture': 'muffled' if a < 0.21 else 'crisp',
+            'density': 'scattered' if npops / dur < 6.0 else 'busy',
+            'pops': npops,
+        }
 
     elif style == "ignition":
         # whoosh: noise brightening as it swells, plus a rising triangle rumble
@@ -1929,8 +2214,15 @@ def gen_fire(rng):
             buf[i] += rumb * triangle(ph) * env
         lo = int(n * 0.55)
         hi = max(lo + 1, n - int(0.03 * SR) - 1)
-        for _ in range(rng.randint(1, 4)):
+        npops = rng.randint(1, 4)
+        for _ in range(npops):
             add_pop(buf, rng.randint(lo, hi), rng.uniform(0.25, 0.6))
+        tags = {
+            'style': 'ignition',
+            'attack': 'fast' if rise / dur < 0.28 else 'slow',
+            'rumble_hz': round(f0),
+            'pops': npops,
+        }
 
     elif style == "torch":
         # sustained flutter: noise pumped by an irregular 8-16 Hz wobble + soft drone
@@ -1956,6 +2248,12 @@ def gen_fire(rng):
         for _ in range(rng.randint(0, 3)):
             pos = rng.randint(0, n - int(0.03 * SR) - 1)
             add_pop(buf, pos, rng.uniform(0.15, 0.35))
+        tags = {
+            'style': 'torch',
+            'flutter_hz': round(rate),
+            'wobble': 'gentle' if depth < 0.4 else 'deep',
+            'drone_hz': round(f0),
+        }
 
     elif style == "sizzle":
         # frying hiss: brightest noise chopped by dense random micro-gates
@@ -1978,9 +2276,16 @@ def gen_fire(rng):
             hold -= 1
             gate += 0.01 * (gtarget - gate)
             buf[i] = lf.next() * gate * math.exp(-drate * i / SR) * 0.9
-        for _ in range(rng.randint(2, 6)):
+        npops = rng.randint(2, 6)
+        for _ in range(npops):
             pos = rng.randint(0, n - int(0.03 * SR) - 1)
             add_pop(buf, pos, rng.uniform(0.2, 0.5))
+        tags = {
+            'style': 'sizzle',
+            'gating': 'patchy' if dense < 0.62 else 'relentless',
+            'heat': 'steady' if drate < 0.95 else 'dying',
+            'pops': npops,
+        }
 
     elif style == "pops":
         # sparse big explosive pops over a quiet, dark crackle bed
@@ -1999,22 +2304,35 @@ def gen_fire(rng):
             frac = (j + rng.uniform(0.05, 0.9)) / k
             pos = min(n - int(0.04 * SR) - 1, int(n * frac))
             add_pop(buf, max(0, pos), rng.uniform(0.8, 1.4))
+        tags = {
+            'style': 'pops',
+            'bursts': k,
+            'bed': 'faint' if a < 0.175 else 'grainy',
+        }
 
     elif style == "ember":
         # glowing embers: very crunchy slow noise, gentle flicker, tiny ticks
         dur = rng.uniform(1.0, 2.3)
         n = int(SR * dur)
         buf = [0.0] * n
-        lf = Lfsr(rng, rng.randint(6, 10))
+        per = rng.randint(6, 10)
+        lf = Lfsr(rng, per)
         a = rng.uniform(0.05, 0.12)
         fl = flicker_env(n, int(0.06 * SR), int(0.18 * SR), 0.3, 1.0, 0.0012)
         y = 0.0
         for i in range(n):
             y += a * (lf.next() - y)
             buf[i] = y * fl[i]
-        for _ in range(rng.randint(2, 6)):
+        npops = rng.randint(2, 6)
+        for _ in range(npops):
             pos = rng.randint(0, n - int(0.03 * SR) - 1)
             add_pop(buf, pos, rng.uniform(0.15, 0.4))
+        tags = {
+            'style': 'ember',
+            'texture': 'gritty' if per < 8 else 'coarse',
+            'glow': 'dim' if a < 0.085 else 'lively',
+            'ticks': npops,
+        }
 
     else:  # flare: crackle swells to a burst with a down-swept square growl
         dur = rng.uniform(0.8, 1.8)
@@ -2050,6 +2368,14 @@ def gen_fire(rng):
         hi = n - int(0.03 * SR) - 1
         for _ in range(rng.randint(1, 3)):
             add_pop(buf, rng.randint(min(ppos, hi - 1), hi), rng.uniform(0.3, 0.7))
+        tags = {
+            'style': 'flare',
+            'peak': 'early' if peak_at < 0.48 else 'late',
+            'growl': 'reedy' if duty == 0.125 else 'hollow',
+            'growl_hz': round(f0),
+        }
+
+    rng.tags = tags
 
     # master: short fade-in, click-free fade-out, then normalize and clamp
     n = len(buf)
@@ -2105,37 +2431,65 @@ def gen_footstep(rng):
         # soft swish: dark filtered hiss, sometimes a fainter toe-drag behind it
         dur = rng.uniform(0.08, 0.18)
         n = int(dur * SR)
-        out = lp_burst(n, rng.randint(1, 2), rng.uniform(0.22, 0.4),
-                       rng.uniform(0.004, 0.012), rng.uniform(25.0, 45.0), 1.0)
-        if rng.random() < 0.5:
+        period = rng.randint(1, 2)
+        alpha = rng.uniform(0.22, 0.4)
+        atk = rng.uniform(0.004, 0.012)
+        rate = rng.uniform(25.0, 45.0)
+        out = lp_burst(n, period, alpha, atk, rate, 1.0)
+        has_drag = rng.random() < 0.5
+        if has_drag:
             off = int(rng.uniform(0.35, 0.6) * n)
             mix_into(out, lp_burst(n - off, 2, rng.uniform(0.15, 0.3), 0.006,
                                    rng.uniform(35.0, 60.0), rng.uniform(0.3, 0.55)), off)
+        tags = {
+            'style': 'grass',
+            'texture': 'rustling' if alpha > 0.31 else 'hushed',
+            'drag': 'toe-drag behind' if has_drag else 'clean single swish',
+            'attack_ms': round(atk * 1000),
+        }
 
     elif style == "gravel":
         # a low thud plus a scatter of tiny crunchy ticks
         dur = rng.uniform(0.1, 0.24)
         n = int(dur * SR)
         out = [0.0] * n
-        mix_into(out, lp_burst(int(0.6 * n), 3, rng.uniform(0.06, 0.12), 0.002,
-                               rng.uniform(30.0, 50.0), rng.uniform(0.5, 0.8)), 0)
-        for k in range(rng.randint(4, 9)):
+        thud_alpha = rng.uniform(0.06, 0.12)
+        thud_rate = rng.uniform(30.0, 50.0)
+        thud_gain = rng.uniform(0.5, 0.8)
+        mix_into(out, lp_burst(int(0.6 * n), 3, thud_alpha, 0.002,
+                               thud_rate, thud_gain), 0)
+        n_ticks = rng.randint(4, 9)
+        for k in range(n_ticks):
             off = 0 if k == 0 else int(rng.uniform(0.0, 0.75) * n)
             ln = int(SR * rng.uniform(0.006, 0.018))
             mix_into(out, lp_burst(ln, rng.randint(2, 6), rng.uniform(0.5, 0.85), 0.0005,
                                    rng.uniform(150.0, 350.0), rng.uniform(0.5, 1.0)), off)
+        tags = {
+            'style': 'gravel',
+            'thud': 'heavy' if thud_gain > 0.65 else 'light',
+            'body': 'tight' if thud_rate > 40.0 else 'boomy',
+            'ticks': n_ticks,
+        }
 
     elif style == "stone":
         # hard bright clack with a short tonal tick on impact
         dur = rng.uniform(0.05, 0.11)
         n = int(dur * SR)
-        out = lp_burst(n, rng.randint(1, 2), rng.uniform(0.55, 0.85), 0.0005,
-                       rng.uniform(70.0, 130.0), 1.0)
+        period = rng.randint(1, 2)
+        alpha = rng.uniform(0.55, 0.85)
+        rate = rng.uniform(70.0, 130.0)
+        out = lp_burst(n, period, alpha, 0.0005, rate, 1.0)
         f = midi(rng.randint(70, 84))
         g = rng.uniform(0.3, 0.5)
         tick = render_tone(min(n, int(0.03 * SR)), lambda t: f,
                            rng.choice([0.125, 0.25]), decay(rng.uniform(120.0, 220.0)))
         mix_into(out, [s * g for s in tick], 0)
+        tags = {
+            'style': 'stone',
+            'clack': 'glassy' if alpha > 0.7 else 'bright',
+            'tick': 'clear' if g > 0.4 else 'faint',
+            'tick_hz': round(f),
+        }
 
     elif style == "wood":
         # plank knock: pitched triangle resonance under a bright tap, heel-toe clack
@@ -2152,17 +2506,26 @@ def gen_footstep(rng):
         mix_into(out, [s * g for s in ovt], 0)
         mix_into(out, lp_burst(int(0.012 * SR), 1, rng.uniform(0.5, 0.8), 0.0003,
                                rng.uniform(200.0, 320.0), rng.uniform(0.4, 0.6)), 0)
-        if rng.random() < 0.6:
+        heel_toe = rng.random() < 0.6
+        if heel_toe:
             mix_into(out, lp_burst(int(0.01 * SR), 1, rng.uniform(0.5, 0.8), 0.0003,
                                    300.0, rng.uniform(0.25, 0.45)),
                      int(rng.uniform(0.3, 0.55) * n))
+        tags = {
+            'style': 'wood',
+            'register': 'low' if f0 < 147.0 else 'mid',
+            'overtone': 'ringing' if g > 0.35 else 'subtle',
+            'taps': 'heel-toe double tap' if heel_toe else 'single tap',
+            'knock_hz': round(f0),
+        }
 
     elif style == "snow":
         # crunch: crunchy LFSR gated into crackle clusters by a slower LFSR
         dur = rng.uniform(0.12, 0.28)
         n = int(dur * SR)
         crunch = Lfsr(rng, rng.randint(5, 9))
-        gate = Lfsr(rng, rng.randint(60, 140))
+        gate_period = rng.randint(60, 140)
+        gate = Lfsr(rng, gate_period)
         alpha = rng.uniform(0.35, 0.6)
         atk = rng.uniform(0.015, 0.045)
         rate = rng.uniform(11.0, 20.0)
@@ -2174,6 +2537,12 @@ def gen_footstep(rng):
             prev += alpha * (crunch.next() - prev)
             g = 1.0 if gate.next() > 0.0 else floor
             out.append(prev * g * min(1.0, t / atk) * math.exp(-rate * t))
+        tags = {
+            'style': 'snow',
+            'texture': 'brittle' if alpha > 0.47 else 'packed',
+            'contrast': 'stark' if floor < 0.25 else 'soft',
+            'crackle_hz': round(SR / gate_period),
+        }
 
     elif style == "mud":
         # squish: very dark noise plus a wobbling low triangle sinking in pitch
@@ -2190,13 +2559,22 @@ def gen_footstep(rng):
                          * (1.0 + depth * math.sin(wob * t)), 0.5,
                          lambda t: min(1.0, t / 0.03) * math.exp(-rate * t), wave_fn="tri")
         mix_into(out, [s * g for s in sw], 0)
+        tags = {
+            'style': 'mud',
+            'wobble': 'queasy' if depth > 0.175 else 'gentle',
+            'weight': 'thick' if g > 0.55 else 'watery',
+            'tone_hz': round(f0),
+        }
 
     else:  # puddle
         # splash: bright wet noise plus a small rising triangle bloop
         dur = rng.uniform(0.1, 0.2)
         n = int(dur * SR)
-        out = lp_burst(n, rng.randint(1, 2), rng.uniform(0.45, 0.75),
-                       rng.uniform(0.001, 0.004), rng.uniform(25.0, 45.0), 1.0)
+        period = rng.randint(1, 2)
+        alpha = rng.uniform(0.45, 0.75)
+        atk = rng.uniform(0.001, 0.004)
+        rate = rng.uniform(25.0, 45.0)
+        out = lp_burst(n, period, alpha, atk, rate, 1.0)
         f0 = midi(rng.randint(55, 65))
         riseoct = rng.uniform(0.6, 1.2)
         bl_dur = rng.uniform(0.04, 0.08)
@@ -2206,6 +2584,15 @@ def gen_footstep(rng):
                            decay(rng.uniform(30.0, 55.0)), wave_fn="tri")
         off = min(int(rng.uniform(0.01, 0.05) * SR), max(0, n - bn))
         mix_into(out, [s * g for s in blip], off)
+        tags = {
+            'style': 'puddle',
+            'splash': 'fizzy' if alpha > 0.6 else 'wet',
+            'bloop': 'plopping' if g > 0.6 else 'soft',
+            'bloop_hz': round(f0),
+            'rise_oct': round(riseoct, 1),
+        }
+
+    rng.tags = tags
 
     # normalize to a healthy chip level, clamp, and fade the tail to zero
     peak = 0.0
@@ -2255,6 +2642,10 @@ def gen_mech(rng):
         drift = rng.uniform(-0.4, 0.7)  # octaves of overall pitch drift
         duty = rng.choice([0.25, 0.5])
         step_len = max(1, int(SR * rng.uniform(0.012, 0.035)))
+        tags["pitch_hz"] = int(round(base))
+        tags["motion"] = "rising" if drift >= 0.0 else "settling"
+        tags["texture"] = "reedy" if duty == 0.25 else "hollow"
+        tags["drift_oct"] = round(drift, 1)
         buf = []
         phase = 0.0
         f = base
@@ -2280,6 +2671,8 @@ def gen_mech(rng):
         n = int(SR * dur)
         f0 = rng.uniform(90.0, 160.0)
         f1 = rng.uniform(30.0, 55.0)
+        tags["thud_hz"] = int(round(f0))
+        tags["weight"] = "deep" if f0 < 125.0 else "boxy"
         sweep_t = dur * 0.6
         buf = render_tone(
             n,
@@ -2288,7 +2681,9 @@ def gen_mech(rng):
         nb = noise_burst(int(n * rng.uniform(0.3, 0.6)), rng.randint(4, 9),
                          rng.uniform(30.0, 60.0), rng.uniform(0.5, 0.9))
         mix_at(buf, nb, 0)
-        if rng.random() < 0.5:  # the frame shudders
+        shudder = rng.random() < 0.5  # the frame shudders
+        tags["frame"] = "shuddering" if shudder else "clean"
+        if shudder:
             for k in range(rng.randint(1, 3)):
                 off = int(n * rng.uniform(0.35, 0.9))
                 nb2 = noise_burst(int(SR * 0.03), rng.randint(3, 6), 80.0,
@@ -2315,6 +2710,10 @@ def gen_mech(rng):
         fb = rng.uniform(400.0, 900.0)
         sw = rng.uniform(0.1, 0.6)  # octaves up over the squeak
         vib = rng.uniform(18.0, 40.0)
+        tags["squeak_hz"] = int(round(fb))
+        tags["gap_ms"] = int(round(gap * 1000.0 / SR))
+        tags["vibrato"] = "fast" if vib >= 29.0 else "slow"
+        tags["rise"] = "climbing" if sw >= 0.35 else "gentle"
         sq = render_tone(
             sn,
             lambda t, fb=fb, sw=sw, sd=sdur, vib=vib:
@@ -2337,9 +2736,13 @@ def gen_mech(rng):
         off = m
         f0 = rng.uniform(70.0, 130.0)
         cn = int(SR * rng.uniform(0.12, 0.22))
+        crate = rng.uniform(18.0, 30.0)
+        tags["clunk_hz"] = int(round(f0))
+        tags["throw"] = "long" if trav >= 0.1 else "short"
+        tags["stop"] = "damped" if crate >= 24.0 else "ringing"
         clunk = render_tone(cn,
                             lambda t, f0=f0: f0 * (1.0 - 0.4 * min(1.0, t * 12.0)),
-                            0.5, decay(rng.uniform(18.0, 30.0)))
+                            0.5, decay(crate))
         mix_at(buf, clunk, off, 1.0)
         nb = noise_burst(int(SR * 0.03), rng.randint(5, 9), 90.0, 0.8)
         mix_at(buf, nb, off)
@@ -2355,8 +2758,12 @@ def gen_mech(rng):
             return out
         buf = []
         fr = rng.uniform(1800.0, 3200.0)
+        tags["click_hz"] = int(round(fr))
+        tags["brightness"] = "piercing" if fr >= 2500.0 else "crisp"
         mix_at(buf, tick(fr, 1.0), 0)
-        if rng.random() < 0.6:
+        pair = rng.random() < 0.6
+        tags["action"] = "click-clack pair" if pair else "single click"
+        if pair:
             mix_at(buf, tick(fr * rng.uniform(1.1, 1.4), 0.8),
                    int(SR * rng.uniform(0.03, 0.09)))
         buf.extend([0.0] * int(SR * 0.03))
@@ -2368,6 +2775,10 @@ def gen_mech(rng):
         hits = rng.randint(4, 9)
         spacing = rng.uniform(0.045, 0.09)
         fr = rng.uniform(500.0, 1100.0)
+        tags["hits"] = hits
+        tags["ping_hz"] = int(round(fr))
+        tags["pace"] = "frantic" if spacing < 0.065 else "loose"
+        tags["register"] = "bright" if fr >= 800.0 else "mid"
         t0 = 0.0
         for k in range(hits):
             off = int(SR * t0)
@@ -2392,6 +2803,9 @@ def gen_mech(rng):
         spacing = rng.uniform(0.05, 0.11)
         accel = rng.uniform(0.94, 1.02)
         fr = rng.uniform(180.0, 380.0)
+        tags["clicks"] = clicks
+        tags["tick_hz"] = int(round(fr))
+        tags["motion"] = "accelerating" if accel < 1.0 else "steady"
         buf = []
         t0 = 0.02
         for k in range(clicks):
@@ -2403,7 +2817,9 @@ def gen_mech(rng):
             mix_at(buf, blip, off, 0.6)
             t0 += spacing
             spacing *= accel
-        if rng.random() < 0.6:
+        droned = rng.random() < 0.6
+        tags["undertone"] = "droning" if droned else "dry"
+        if droned:
             n = len(buf)
             fd = fr * 0.35
             drone = render_tone(n, lambda t, f=fd: f, 0.5,
@@ -2419,7 +2835,11 @@ def gen_mech(rng):
         # key ring jangle: scattered detuned high ping pairs with click transients
         dur = rng.uniform(0.3, 0.8)
         buf = [0.0] * int(SR * (dur + 0.08))
-        for k in range(rng.randint(6, 14)):
+        jingles = rng.randint(6, 14)
+        tags["pings"] = jingles
+        tags["density"] = "busy" if jingles >= 10 else "sparse"
+        tags["shake"] = "sustained" if dur >= 0.55 else "quick"
+        for k in range(jingles):
             off = int(SR * rng.uniform(0.0, dur))
             f = rng.uniform(1200.0, 3400.0)
             f2 = f * rng.uniform(1.01, 1.06)
@@ -2434,6 +2854,7 @@ def gen_mech(rng):
 
     style = rng.choice(["creak", "slam", "latch", "lever",
                         "switch", "rattle", "ratchet", "keys"])
+    tags = {"style": style}
     if style == "creak":
         buf = creak()
     elif style == "slam":
@@ -2450,6 +2871,8 @@ def gen_mech(rng):
         buf = ratchet()
     else:
         buf = keys()
+
+    rng.tags = tags
 
     # clamp duration to 0.1 - 1.2 s
     n_min = int(SR * 0.1)
@@ -2486,6 +2909,894 @@ def gen_mech(rng):
             buf[i] *= g
     return buf
 
+def gen_person(rng):
+    """Human body foley, chip-imitated: heartbeats, breathing, sneezes, coughs,
+    snores, yawns, gulps, chewing, claps, applause, snaps, shivers, gut growls.
+    Deliberately non-vocal (dialog/grunts/laughs live in gen_voice): everything
+    here is air, impact, and gut — LFSR noise pushed through hand-rolled
+    one-pole filters, plus low triangle thumps for the body resonance."""
+    rng.random()
+    rng.random()
+    rng.random()
+    rng.random()  # warm-up draws: decorrelates style pick across nearby seeds
+    out = []
+
+    def add(buf, at):
+        need = at + len(buf)
+        while len(out) < need:
+            out.append(0.0)
+        for i, v in enumerate(buf):
+            out[at + i] += v
+
+    def one_pole_hz(alpha):
+        # readable cutoff of the hand-rolled one-pole lowpass, for the tags
+        return int(round(-SR * math.log(1.0 - alpha) / (2.0 * math.pi) / 10.0) * 10)
+
+    def thump(dur, f0, drop, rate, amp=1.0):
+        # low triangle knock, pitch sagging to drop*f0 — heart / chest / jaw body
+        n = int(SR * dur)
+        ph = 0.0
+        buf = []
+        for i in range(n):
+            t = i / SR
+            u = i / n
+            ph += f0 * (drop ** u) / SR
+            buf.append(triangle(ph) * min(1.0, t / 0.004) * math.exp(-rate * u) * amp)
+        return buf
+
+    def gust(dur, a0, a1, amp, lf, shape=1.0, gate_hz=0.0, gate_depth=0.0):
+        # shaped air: LFSR noise through a one-pole lowpass whose alpha glides
+        # a0 -> a1; sine-window envelope; optional soft-palate gate (snores)
+        n = int(SR * dur)
+        y = 0.0
+        buf = []
+        for i in range(n):
+            t = i / SR
+            u = i / n
+            y += (a0 + (a1 - a0) * u) * (lf.next() - y)
+            env = math.sin(math.pi * u) ** shape
+            if gate_hz > 0.0:
+                env *= 1.0 - gate_depth * (0.5 + 0.5 * square(t * gate_hz, 0.5))
+            buf.append(y * env * amp)
+        return buf
+
+    def bark(dur, a0, a1, amp, dk, lf, gate_hz=0.0, gate_depth=0.0):
+        # percussive air burst: instant attack, exponential decay (coughs, claps)
+        n = int(SR * dur)
+        y = 0.0
+        buf = []
+        for i in range(n):
+            t = i / SR
+            u = i / n
+            y += (a0 + (a1 - a0) * u) * (lf.next() - y)
+            env = min(1.0, t / 0.003) * math.exp(-dk * u)
+            if gate_hz > 0.0:
+                env *= 1.0 - gate_depth * (0.5 + 0.5 * square(t * gate_hz, 0.5))
+            buf.append(y * env * amp)
+        return buf
+
+    def glug(dur, fa, fb, amp):
+        # falling triangle blip — the liquid knock of a swallow
+        n = int(SR * dur)
+        ph = 0.0
+        buf = []
+        for i in range(n):
+            t = i / SR
+            u = i / n
+            ph += (fa + (fb - fa) * u) / SR
+            buf.append(triangle(ph) * min(1.0, t / 0.004) * ((1.0 - u) ** 1.2) * amp)
+        return buf
+
+    style = rng.choice(["heartbeat", "breath", "sneeze", "cough", "snore", "yawn",
+                        "gulp", "chew", "clap", "applause", "snap", "shiver", "growl"])
+
+    if style == "heartbeat":
+        # lub-dub pairs on a falling triangle thump, dub softer and lower
+        bpm = rng.randint(52, 96)
+        pairs = rng.choice([1, 2, 2, 3])
+        f0 = rng.uniform(46.0, 72.0)
+        gap = rng.uniform(0.13, 0.2)
+        rate = rng.uniform(4.5, 7.0)
+        beat = 60.0 / bpm
+        while pairs > 1 and (pairs - 1) * beat + 0.4 > 2.0:
+            pairs -= 1
+        rng.tags = {"style": "heartbeat", "bpm": bpm, "beats": pairs,
+                    "thump_hz": int(round(f0)),
+                    "depth": "deep" if f0 < 58.0 else "light"}
+        for k in range(pairs):
+            t0 = k * beat
+            add(thump(0.16, f0 * 1.15, 0.45, rate), int(t0 * SR))
+            add(thump(0.14, f0, 0.5, rate * 1.15, amp=0.8), int((t0 + gap) * SR))
+
+    elif style == "breath":
+        # in/out air cycles; the one-pole cutoff sets how open the mouth sounds
+        mode = rng.choice(["calm", "heavy", "winded"])
+        lf = Lfsr(rng, 1)
+        if mode == "calm":
+            gusts = 2
+            a = rng.uniform(0.03, 0.055)
+            inh = rng.uniform(0.5, 0.75)
+            pause = rng.uniform(0.08, 0.16)
+            add(gust(inh, a * 0.6, a, 0.9, lf, shape=1.3), 0)
+            add(gust(rng.uniform(0.65, 0.95), a, a * 0.4, 0.7, lf, shape=1.5),
+                int((inh + pause) * SR))
+        elif mode == "heavy":
+            gusts = 2
+            a = rng.uniform(0.07, 0.13)
+            inh = rng.uniform(0.35, 0.5)
+            pause = rng.uniform(0.05, 0.1)
+            add(gust(inh, a * 0.5, a * 1.2, 1.0, lf, shape=0.8), 0)
+            add(gust(rng.uniform(0.45, 0.65), a, a * 0.35, 0.85, lf, shape=1.0),
+                int((inh + pause) * SR))
+        else:  # winded: quick alternating puffs, in bright, out duller
+            gusts = rng.randint(3, 5)
+            a = rng.uniform(0.12, 0.22)
+            puff = rng.uniform(0.15, 0.22)
+            gap = rng.uniform(0.05, 0.11)
+            pos = 0
+            for k in range(gusts):
+                inhale = k % 2 == 0
+                add(gust(puff, a * (1.1 if inhale else 0.6),
+                         a * (0.5 if inhale else 0.3),
+                         1.0 if inhale else 0.75, lf, shape=0.7), pos)
+                pos += int((puff + gap) * SR)
+        air_hz = one_pole_hz(a)
+        rng.tags = {"style": "breath", "mode": mode, "gusts": gusts,
+                    "air_hz": air_hz, "tone": "bright" if air_hz >= 400 else "dark"}
+
+    elif style == "sneeze":
+        # soft rising wind-up, then an explosive bright burst over a chest thump
+        lf = Lfsr(rng, 1)
+        wind = rng.uniform(0.12, 0.3)
+        burst = rng.uniform(0.16, 0.3)
+        ab = rng.uniform(0.18, 0.34)
+        dk = rng.uniform(7.0, 11.0)
+        kick = rng.uniform(0.3, 0.7)
+        rng.tags = {"style": "sneeze",
+                    "buildup": "long" if wind > 0.21 else "short",
+                    "burst_hz": one_pole_hz(ab),
+                    "kick": "chesty" if kick > 0.5 else "airy"}
+        add(gust(wind, 0.02, 0.1, 0.4, lf, shape=1.2), 0)
+        p = int(wind * SR)
+        add(thump(0.09, rng.uniform(70.0, 110.0), 0.4, 9.0, amp=kick), p)
+        add(bark(burst, ab, ab * 0.25, 1.0, dk, lf), p)
+
+    elif style == "cough":
+        # noise barks over a chest thud; chesty adds a slow amplitude rattle
+        kind = rng.choice(["dry", "dry", "chesty"])
+        barks = rng.choice([1, 2, 2, 3])
+        lf = Lfsr(rng, rng.choice([1, 2]))
+        grit = "coarse" if lf.period == 2 else "fine"
+        pos = 0
+        if kind == "dry":
+            fthud = rng.uniform(85.0, 130.0)
+            rng.tags = {"style": "cough", "kind": kind, "barks": barks,
+                        "thud_hz": int(round(fthud)), "grit": grit}
+            for _ in range(barks):
+                d = rng.uniform(0.09, 0.16)
+                add(thump(0.07, fthud, 0.5, 10.0, amp=0.55), pos)
+                add(bark(d, rng.uniform(0.16, 0.28), 0.05, 1.0,
+                         rng.uniform(7.0, 10.0), lf), pos)
+                pos += int((d + rng.uniform(0.09, 0.18)) * SR)
+        else:
+            rat = rng.uniform(24.0, 44.0)
+            rng.tags = {"style": "cough", "kind": kind, "barks": barks,
+                        "rattle_hz": int(round(rat)), "grit": grit}
+            for _ in range(barks):
+                d = rng.uniform(0.16, 0.28)
+                add(thump(0.09, rng.uniform(65.0, 100.0), 0.45, 8.0, amp=0.7), pos)
+                add(bark(d, rng.uniform(0.07, 0.12), 0.03, 1.0,
+                         rng.uniform(4.5, 6.5), lf, gate_hz=rat, gate_depth=0.7), pos)
+                pos += int((d + rng.uniform(0.1, 0.2)) * SR)
+
+    elif style == "snore":
+        # one cycle: long rattly drag in (gated dark noise), soft puff out
+        rat = rng.uniform(15.0, 27.0)
+        inh = rng.uniform(0.7, 1.05)
+        pause = rng.uniform(0.1, 0.2)
+        a = rng.uniform(0.035, 0.08)
+        lf = Lfsr(rng, rng.choice([1, 2, 3]))
+        puffed = rng.random() < 0.75
+        rng.tags = {"style": "snore", "rattle_hz": int(round(rat)),
+                    "air_hz": one_pole_hz(a),
+                    "depth": "deep" if rat < 20.0 else "light",
+                    "exhale": "puffed" if puffed else "held"}
+        add(gust(inh, a * 0.7, a * 1.3, 1.0, lf, shape=0.9,
+                 gate_hz=rat, gate_depth=0.85), 0)
+        if puffed:
+            add(gust(rng.uniform(0.35, 0.6), a * 1.2, a * 0.5, 0.45, lf, shape=1.4),
+                int((inh + pause) * SR))
+
+    elif style == "yawn":
+        # airflow swells to a crest then relaxes; a faint undertone sags with it
+        dur = rng.uniform(1.0, 1.7)
+        crest = rng.uniform(0.35, 0.6)
+        peak_a = rng.uniform(0.05, 0.12)
+        fall = rng.uniform(0.5, 1.2)
+        f0 = rng.uniform(150.0, 240.0)
+        under = rng.uniform(0.1, 0.22)
+        lf = Lfsr(rng, 1)
+        rng.tags = {"style": "yawn", "fall_oct": round(fall, 1),
+                    "sag_hz": int(round(f0)),
+                    "air": "breathy" if peak_a > 0.085 else "hollow",
+                    "crest": "early" if crest < 0.47 else "late"}
+        n = int(SR * dur)
+        y = 0.0
+        ph = 0.0
+        buf = []
+        for i in range(n):
+            u = i / n
+            w = u / crest if u < crest else (1.0 - u) / (1.0 - crest)
+            y += (0.015 + peak_a * w * w) * (lf.next() - y)
+            ph += f0 * (2.0 ** (-fall * u)) / SR
+            buf.append((y + triangle(ph) * under * w) * (w ** 0.7))
+        add(buf, 0)
+
+    elif style == "gulp":
+        # two falling glugs and a throat thump; optional dry tick up front
+        f0 = rng.uniform(210.0, 340.0)
+        ticked = rng.random() < 0.6
+        lf = Lfsr(rng, 1)
+        rng.tags = {"style": "gulp", "start_hz": int(round(f0)),
+                    "size": "big" if f0 < 270.0 else "small",
+                    "onset": "ticked" if ticked else "clean"}
+        if ticked:
+            add(bark(0.02, 0.5, 0.2, 0.5, 6.0, lf), 0)
+        pos = int(rng.uniform(0.015, 0.04) * SR)
+        add(glug(rng.uniform(0.05, 0.08), f0, f0 * 0.45, 0.9), pos)
+        pos += int(rng.uniform(0.07, 0.12) * SR)
+        add(glug(rng.uniform(0.07, 0.11), f0 * 0.7, f0 * 0.28, 1.0), pos)
+        add(thump(0.08, rng.uniform(60.0, 90.0), 0.5, 8.0, amp=0.5),
+            pos + int(0.02 * SR))
+
+    elif style == "chew":
+        # jaw thud + crunch per bite; slow sample-and-hold noise = crunchier
+        bites = rng.randint(2, 5)
+        period = rng.choice([4, 6, 10, 14])
+        lf = Lfsr(rng, period)
+        step = rng.uniform(0.16, 0.28)
+        rng.tags = {"style": "chew", "bites": bites,
+                    "gap_ms": int(round(step * 1000)),
+                    "texture": "crunchy" if period <= 6 else "soft",
+                    "pace": "brisk" if step < 0.21 else "lazy"}
+        pos = 0
+        for _ in range(bites):
+            add(thump(0.05, rng.uniform(90.0, 140.0), 0.5, 9.0, amp=0.6), pos)
+            add(bark(rng.uniform(0.05, 0.09), 0.3, 0.08,
+                     rng.uniform(0.75, 1.0), 5.0, lf), pos)
+            pos += int(step * rng.uniform(0.85, 1.15) * SR)
+
+    elif style == "clap":
+        # one tight bright burst, optionally answered by a small slapback
+        d = rng.uniform(0.03, 0.06)
+        lf = Lfsr(rng, rng.choice([1, 1, 2]))
+        a0 = rng.uniform(0.3, 0.55)
+        echo = rng.random() < 0.5
+        rng.tags = {"style": "clap", "burst_ms": int(round(d * 1000)),
+                    "grit": "tight" if lf.period == 1 else "gritty",
+                    "room": "slapback" if echo else "dry"}
+        add(bark(d, a0, a0 * 0.4, 1.0, 6.0, lf), 0)
+        if echo:
+            add(bark(d * 0.9, a0 * 0.7, a0 * 0.3, 0.35, 6.0, lf),
+                int(rng.uniform(0.055, 0.09) * SR))
+
+    elif style == "applause":
+        # many tiny claps scattered over the window, density shaping the arc
+        dur = rng.uniform(1.2, 1.9)
+        claps = rng.randint(14, 34)
+        arc = rng.choice(["building", "fading", "steady"])
+        lf = Lfsr(rng, 1)
+        rng.tags = {"style": "applause", "claps": claps, "arc": arc,
+                    "crowd": "thick" if claps >= 24 else "sparse"}
+        for _ in range(claps):
+            r = rng.random()
+            if arc == "building":
+                r = r ** 0.55
+            elif arc == "fading":
+                r = r ** 1.8
+            a0 = rng.uniform(0.25, 0.5)
+            add(bark(rng.uniform(0.018, 0.035), a0, a0 * 0.5,
+                     rng.uniform(0.4, 1.0), 5.0, lf), int(r * (dur - 0.06) * SR))
+
+    elif style == "snap":
+        # skin click then a narrow triangle ping — the knuckle resonance
+        fp = rng.uniform(1500.0, 3200.0)
+        pd = rng.uniform(0.04, 0.08)
+        lf = Lfsr(rng, 1)
+        rng.tags = {"style": "snap", "ping_hz": int(round(fp)),
+                    "tone": "glassy" if fp > 2300.0 else "woody",
+                    "tail": "ringing" if pd > 0.06 else "tight"}
+        add(bark(0.012, 0.6, 0.3, 0.8, 4.0, lf), 0)
+        n = int(SR * pd)
+        ph = 0.0
+        buf = []
+        for i in range(n):
+            t = i / SR
+            u = i / n
+            ph += fp / SR
+            buf.append(triangle(ph) * min(1.0, t / 0.001) * math.exp(-7.0 * u) * 0.9)
+        add(buf, int(0.004 * SR))
+
+    elif style == "shiver":
+        # teeth chatter: jittered tick train, upper/lower teeth alternating
+        rate = rng.uniform(13.0, 24.0)
+        dur = rng.uniform(0.5, 1.1)
+        lf = Lfsr(rng, rng.choice([1, 2]))
+        t0 = 0.0
+        k = 0
+        while t0 < dur:
+            a0 = 0.5 if k % 2 == 0 else 0.28
+            amp = (0.55 + 0.45 * math.sin(math.pi * t0 / dur)) * rng.uniform(0.7, 1.0)
+            add(bark(rng.uniform(0.006, 0.012), a0, a0 * 0.6, amp, 3.0, lf),
+                int(t0 * SR))
+            t0 += rng.uniform(0.85, 1.15) / rate
+            k += 1
+        rng.tags = {"style": "shiver", "rate_hz": int(round(rate)), "ticks": k,
+                    "tremble": "violent" if rate > 18.5 else "mild",
+                    "grit": "icy" if lf.period == 1 else "bony"}
+
+    else:  # stomach growl
+        # wandering low triangle with sample-and-hold pitch wobble, crackle
+        # bed, and a few rising glug bubbles working their way up
+        dur = rng.uniform(0.9, 1.7)
+        f0 = rng.uniform(42.0, 88.0)
+        bubbles = rng.randint(2, 5)
+        crackle = Lfsr(rng, rng.randint(10, 16))
+        hold = int(SR * rng.uniform(0.05, 0.12))
+        rng.tags = {"style": "growl", "base_hz": int(round(f0)),
+                    "bubbles": bubbles,
+                    "mood": "hungry" if f0 >= 62.0 else "queasy"}
+        n = int(SR * dur)
+        ph = 0.0
+        w = 0.0
+        wt = 0.0
+        buf = []
+        for i in range(n):
+            u = i / n
+            if i % hold == 0:
+                wt = rng.uniform(-1.0, 1.0)
+            w += (wt - w) * 0.0015
+            ph += f0 * (1.0 + 0.3 * w) / SR
+            env = min(1.0, u / 0.12) * min(1.0, (1.0 - u) / 0.18)
+            buf.append((triangle(ph) * 0.85 + crackle.next() * 0.2) * env)
+        add(buf, 0)
+        for _ in range(bubbles):
+            t0 = rng.uniform(0.1, dur - 0.15)
+            fb = rng.uniform(120.0, 260.0)
+            m = int(SR * rng.uniform(0.04, 0.07))
+            ph2 = 0.0
+            bb = []
+            for i in range(m):
+                uu = i / m
+                ph2 += (fb * (1.0 + 0.9 * uu)) / SR
+                bb.append(triangle(ph2) * math.sin(math.pi * uu) * 0.5)
+            add(bb, int(t0 * SR))
+
+    # shared finish: pad/clamp to 0.12-2.0 s, DC-block, de-click, normalize
+    if not out:
+        out.append(0.0)
+    n_min = int(SR * 0.12)
+    n_max = int(SR * 2.0)
+    if len(out) < n_min:
+        out.extend([0.0] * (n_min - len(out)))
+    elif len(out) > n_max:
+        del out[n_max:]
+    px = 0.0
+    py = 0.0
+    for i in range(len(out)):  # hand-rolled one-pole DC blocker (~10 Hz corner)
+        x = out[i]
+        py = x - px + 0.997 * py
+        px = x
+        out[i] = py
+    fi = min(len(out) // 2, int(SR * 0.002))
+    for i in range(fi):
+        out[i] *= i / fi
+    fo = min(len(out) // 2, int(SR * 0.012))
+    for i in range(fo):
+        out[len(out) - 1 - i] *= i / fo
+    peak = 0.0
+    for v in out:
+        a = -v if v < 0.0 else v
+        if a > peak:
+            peak = a
+    if peak > 1e-9:
+        g = rng.uniform(0.7, 0.92) / peak
+        for i in range(len(out)):
+            out[i] *= g
+    return out
+
+
+def gen_rpg(rng):
+    # RPG-mechanics staples: melee, ranged, magic, loot, and progress jingles.
+    # Complements the ported pixel-rpg event set (which already covers steps,
+    # dialog blips, menus, dice, damage/heal, fetch, and story fanfares).
+
+    def mix_at(dst, src, offset, gain=1.0):
+        need = offset + len(src)
+        if need > len(dst):
+            dst.extend([0.0] * (need - len(dst)))
+        for i in range(len(src)):
+            dst[offset + i] += src[i] * gain
+
+    def noise_burst(n, period, rate, gain=1.0):
+        lf = Lfsr(rng, period)
+        return [lf.next() * math.exp(-rate * (i / SR)) * gain for i in range(n)]
+
+    def lp_sweep(n, period, a0, a1, rate, gain=1.0, atk=0.0):
+        # one-pole lowpassed LFSR noise; cutoff coefficient glides a0 -> a1
+        lf = Lfsr(rng, period)
+        out = []
+        prev = 0.0
+        inv = 1.0 / max(atk, 1e-4)
+        for i in range(n):
+            t = i / SR
+            prev += (a0 + (a1 - a0) * (i / n)) * (lf.next() - prev)
+            a = t * inv
+            if a > 1.0:
+                a = 1.0
+            out.append(prev * a * math.exp(-rate * t) * gain)
+        return out
+
+    def fade_tail(seq, ms=25.0):
+        # ramp a buffer's last few ms to zero so a mid-effect voice can stop
+        # while other voices keep sounding, without a step click
+        r = min(len(seq), int(SR * ms * 0.001))
+        for i in range(r):
+            seq[len(seq) - 1 - i] *= i / r
+        return seq
+
+    style = rng.choice([
+        "sword_swing", "metal_clash", "bow_shot", "spell_fire", "spell_ice",
+        "spell_zap", "buff_shimmer", "potion_glug", "level_up", "quest_done",
+        "loot_jingle", "chest_open", "shield_block", "trap_spring",
+        "teleport", "game_over", "save_chime",
+    ])
+
+    if style == "sword_swing":
+        # air-cutting whoosh: bright->dark filtered noise under a falling whistle
+        swipes = 2 if rng.random() < 0.3 else 1
+        dur = rng.uniform(0.14, 0.24)
+        f_wh = rng.uniform(900.0, 2000.0)
+        drop = rng.uniform(1.0, 2.2)
+        rate = rng.uniform(13.0, 22.0)
+        n = int(SR * dur)
+        buf = []
+        off = 0
+        for k in range(swipes):
+            sw = fade_tail(lp_sweep(n, rng.randint(1, 2), rng.uniform(0.5, 0.8),
+                                    rng.uniform(0.06, 0.16), rate, 1.0,
+                                    atk=rng.uniform(0.012, 0.035)))
+            mix_at(buf, sw, off, 0.8 ** k)
+            wh = fade_tail(render_tone(
+                n, lambda t, f=f_wh, d=dur, dr=drop: f * 2.0 ** (-dr * t / d),
+                0.5, lambda t, r=rate: min(1.0, t / 0.02) * math.exp(-r * t),
+                "tri"))
+            mix_at(buf, wh, off, rng.uniform(0.3, 0.5))
+            off += int(n * rng.uniform(0.7, 0.9))
+        tags = {"style": "sword swing",
+                "arc": "cutting" if rate > 17.5 else "broad",
+                "swipes": swipes, "whistle_hz": int(round(f_wh))}
+
+    elif style == "metal_clash":
+        # blade on blade: three inharmonic square partials over a spark of noise
+        f = rng.uniform(420.0, 900.0)
+        dur = rng.uniform(0.28, 0.55)
+        n = int(SR * dur)
+        ring = rng.uniform(8.0, 18.0)
+        ratios = [1.0, rng.uniform(1.48, 1.72), rng.uniform(2.28, 2.78)]
+        gains = [1.0, rng.uniform(0.5, 0.75), rng.uniform(0.3, 0.55)]
+        buf = []
+        for j in range(3):
+            pt = render_tone(n, lambda t, fr=f * ratios[j]: fr,
+                             0.5 if j == 0 else 0.25, decay(ring + 5.0 * j))
+            mix_at(buf, pt, 0, gains[j])
+        spark = rng.uniform(0.5, 1.1)
+        mix_at(buf, noise_burst(int(SR * 0.02), 1, 240.0), 0, spark)
+        tags = {"style": "metal clash", "clang_hz": int(round(f)),
+                "ring": "long" if ring < 12.0 else "short",
+                "attack": "sparking" if spark > 0.8 else "clean"}
+
+    elif style == "bow_shot":
+        # string twang settling sharp-to-true, then the arrow zips off
+        f0 = rng.uniform(140.0, 300.0)
+        vib = rng.uniform(40.0, 85.0)
+        tw_dur = rng.uniform(0.09, 0.16)
+        tn = int(SR * tw_dur)
+        buf = fade_tail(render_tone(
+            tn,
+            lambda t, f=f0, v=vib: f * (1.0 + 0.22 * math.exp(-34.0 * t))
+            * (1.0 + 0.05 * math.exp(-11.0 * t) * math.sin(2.0 * math.pi * v * t)),
+            0.25, decay(rng.uniform(20.0, 30.0))))
+        zn = int(SR * rng.uniform(0.08, 0.16))
+        zip_ = fade_tail(lp_sweep(zn, 1, rng.uniform(0.15, 0.25),
+                                  rng.uniform(0.6, 0.85), rng.uniform(11.0, 18.0),
+                                  1.0, atk=0.01))
+        z_off = int(tn * rng.uniform(0.3, 0.55))
+        mix_at(buf, zip_, z_off, rng.uniform(0.35, 0.6))
+        hit = rng.random() < 0.5
+        if hit:
+            fk = rng.uniform(80.0, 130.0)
+            kn = int(SR * rng.uniform(0.06, 0.1))
+            knock = render_tone(kn, lambda t, fr=fk: fr, 0.5,
+                                decay(rng.uniform(35.0, 55.0)), "tri")
+            h_off = z_off + zn
+            mix_at(buf, knock, h_off, rng.uniform(0.7, 1.0))
+            mix_at(buf, noise_burst(int(SR * 0.012), 1, 300.0), h_off, 0.5)
+        tags = {"style": "bow shot", "twang_hz": int(round(f0)),
+                "string": "tight" if vib > 62.0 else "slack",
+                "arrow": "thunk" if hit else "zip"}
+
+    elif style == "spell_fire":
+        # fire spell: a blooming dark-noise whoosh with crackles and a low roar
+        dur = rng.uniform(0.4, 0.8)
+        n = int(SR * dur)
+        atk = rng.uniform(0.04, 0.14)
+        rate = rng.uniform(5.0, 9.0)
+        buf = lp_sweep(n, rng.randint(2, 4), rng.uniform(0.08, 0.16),
+                       rng.uniform(0.3, 0.5), rate, 1.0, atk=atk)
+        crackles = rng.randint(3, 8)
+        for k in range(crackles):
+            off = int(n * rng.uniform(0.15, 0.85))
+            cl = noise_burst(int(SR * rng.uniform(0.006, 0.014)),
+                             rng.randint(1, 2), rng.uniform(180.0, 320.0),
+                             rng.uniform(0.4, 0.8))
+            mix_at(buf, cl, off)
+        fr = rng.uniform(55.0, 90.0)
+        roar = render_tone(
+            n, lambda t, f=fr: f * (1.0 + 0.12 * math.sin(23.0 * t)), 0.5,
+            lambda t, a=atk, r=rate: min(1.0, t / a) * math.exp(-r * t), "tri")
+        rg = rng.uniform(0.4, 0.7)
+        mix_at(buf, roar, 0, rg)
+        tags = {"style": "fire spell", "crackles": crackles,
+                "roar_hz": int(round(fr)),
+                "body": "throaty" if rg > 0.55 else "airy",
+                "surge": "slow bloom" if atk > 0.08 else "fast burst"}
+
+    elif style == "spell_ice":
+        # ice spell: glassy narrow-duty shards scattered under a frosty hiss
+        shards = rng.randint(4, 8)
+        top = rng.uniform(1800.0, 3200.0)
+        span = rng.uniform(0.25, 0.5)
+        buf = []
+        for k in range(shards):
+            fs = top * (2.0 ** (-rng.uniform(0.0, 1.2)))
+            ln = int(SR * rng.uniform(0.03, 0.06))
+            off = int(SR * (span * k / shards + rng.uniform(0.0, 0.02)))
+            sh = fade_tail(render_tone(ln, lambda t, fr=fs: fr, 0.125,
+                                       decay(rng.uniform(80.0, 130.0))), 10.0)
+            mix_at(buf, sh, off, rng.uniform(0.5, 0.9))
+        hiss_g = rng.uniform(0.1, 0.3)
+        mix_at(buf, lp_sweep(len(buf), 1, 0.8, 0.5, rng.uniform(6.0, 10.0),
+                             hiss_g, atk=0.03), 0)
+        tags = {"style": "ice spell", "shards": shards, "top_hz": int(round(top)),
+                "glint": "glassy" if hiss_g < 0.2 else "frosty"}
+
+    elif style == "spell_zap":
+        # arcane zap: a diving square carrying a hard LFO buzz
+        f0 = rng.uniform(1100.0, 2000.0)
+        fall = rng.uniform(1.4, 2.6)
+        dur = rng.uniform(0.16, 0.3)
+        n = int(SR * dur)
+        bz = rng.uniform(28.0, 70.0)
+        depth = rng.uniform(0.2, 0.45)
+        duty = rng.choice([0.125, 0.25])
+        rr = rng.uniform(9.0, 14.0)
+        buf = render_tone(
+            n,
+            lambda t, f=f0, fa=fall, d=dur, b=bz, dp=depth:
+                f * 2.0 ** (-fa * t / d) * (1.0 + dp * square(b * t, 0.5)),
+            duty,
+            lambda t, r=rr, d=dur:
+                math.exp(-r * t) * min(1.0, max(0.0, (d - t) / (0.15 * d))))
+        tags = {"style": "arcane zap", "from_hz": int(round(f0)),
+                "fall_oct": round(fall, 1),
+                "buzz": "coarse" if bz < 48.0 else "fine"}
+
+    elif style == "buff_shimmer":
+        # heal/buff shimmer: two detuned triangles gliding up under a tremolo
+        f0 = rng.uniform(midi(69), midi(81))
+        rise = rng.uniform(0.5, 1.0)
+        dur = rng.uniform(0.5, 0.9)
+        n = int(SR * dur)
+        trem = rng.uniform(5.0, 10.0)
+        tdep = rng.uniform(0.25, 0.5)
+        det = rng.uniform(1.003, 1.009)
+
+        def env(t, d=dur, tr=trem, dp=tdep):
+            a = min(1.0, t / 0.06)
+            rel = min(1.0, max(0.0, (d - t) / (0.25 * d)))
+            return a * rel * (1.0 - dp * 0.5 * (1.0 + math.sin(2.0 * math.pi * tr * t)))
+
+        buf = render_tone(n, lambda t, f=f0, r=rise, d=dur: f * 2.0 ** (r * t / d),
+                          0.5, env, "tri")
+        hi = render_tone(n, lambda t, f=f0 * 2.0 * det, r=rise, d=dur:
+                         f * 2.0 ** (r * t / d), 0.5, env, "tri")
+        mix_at(buf, hi, 0, rng.uniform(0.35, 0.55))
+        tags = {"style": "buff shimmer", "base_hz": int(round(f0)),
+                "rise_oct": round(rise, 1),
+                "tremolo": "fluttery" if trem > 7.5 else "gentle"}
+
+    elif style == "potion_glug":
+        # bottle glugs: pitch-dipping triangle blubs stepping up as it empties
+        glugs = rng.randint(2, 4)
+        f0 = rng.uniform(160.0, 260.0)
+        step = rng.uniform(1.1, 1.25)
+        gl = rng.uniform(0.07, 0.11)
+        buf = []
+        off = 0
+        for k in range(glugs):
+            fk = f0 * (step ** k)
+            gn = int(SR * gl)
+            g = render_tone(
+                gn,
+                lambda t, f=fk, d=gl: f * (1.0 - 0.45 * math.sin(math.pi * min(1.0, t / d))),
+                0.5, lambda t, d=gl: math.sin(math.pi * min(1.0, t / d)) ** 2, "tri")
+            mix_at(buf, g, off)
+            mix_at(buf, noise_burst(int(SR * 0.015), rng.randint(2, 3),
+                                    rng.uniform(120.0, 200.0)), off,
+                   rng.uniform(0.15, 0.3))
+            off += gn + int(SR * rng.uniform(0.02, 0.05))
+        tags = {"style": "potion glug", "glugs": glugs, "start_hz": int(round(f0)),
+                "pour": "thick" if f0 < 205.0 else "thin"}
+
+    elif style == "level_up":
+        # level-up fanfare: a quick major climb into a held (maybe vibrato) top
+        root = rng.randint(55, 69)
+        pat = rng.choice([[0, 4, 7, 12], [0, 4, 7, 12, 16], [0, 7, 12, 16],
+                          [0, 5, 9, 12]])
+        duty = rng.choice([0.25, 0.5])
+        nl = rng.uniform(0.055, 0.085)
+        buf = []
+        off = 0
+        vib_on = False
+        for k, iv in enumerate(pat):
+            fq = midi(root + iv)
+            last = k == len(pat) - 1
+            if last:
+                dn = int(SR * rng.uniform(0.28, 0.4))
+                vib_on = rng.random() < 0.6
+                vr = rng.uniform(5.5, 8.0)
+                nt = render_tone(
+                    dn,
+                    lambda t, fr=fq, v=vr, on=vib_on:
+                        fr * (1.0 + (0.012 * math.sin(2.0 * math.pi * v * t) if on else 0.0)),
+                    duty, decay(rng.uniform(8.0, 11.0)))
+            else:
+                nt = render_tone(int(SR * nl), lambda t, fr=fq: fr, duty, decay(14.0))
+            mix_at(buf, nt, off)
+            off += int(SR * nl)
+        tags = {"style": "level-up fanfare", "notes": len(pat),
+                "root_hz": int(round(midi(root))),
+                "finish": "vibrato hold" if vib_on else "clean hold"}
+
+    elif style == "quest_done":
+        # quest-complete stinger: a pickup note into a rolled, hanging chord
+        root = rng.randint(58, 74)
+        duty = rng.choice([0.25, 0.5])
+        pk = midi(root - 5)
+        buf = fade_tail(render_tone(int(SR * 0.07), lambda t, f=pk: f, duty,
+                                    decay(16.0)))
+        chord = [0, 4, 7, 12][:rng.choice([3, 4])]
+        off = int(SR * rng.uniform(0.08, 0.11))
+        roll = int(SR * rng.uniform(0.015, 0.03))
+        hold = rng.uniform(0.3, 0.45)
+        for k, iv in enumerate(chord):
+            fq = midi(root + iv)
+            nt = render_tone(int(SR * hold), lambda t, fr=fq: fr, duty,
+                             decay(rng.uniform(7.0, 10.0)))
+            mix_at(buf, nt, off + k * roll, 0.8 / (1.0 + 0.15 * k))
+        tags = {"style": "quest stinger", "chord": len(chord),
+                "root_hz": int(round(midi(root))),
+                "voice": "bright" if duty == 0.25 else "warm"}
+
+    elif style == "loot_jingle":
+        # gold spill: a handful of tiny narrow-duty coin tinks
+        coins = rng.randint(3, 6)
+        top = rng.randint(91, 102)
+        span = rng.uniform(0.12, 0.3)
+        buf = []
+        for k in range(coins):
+            fq = midi(top - rng.randint(0, 7))
+            ln = int(SR * rng.uniform(0.05, 0.08))
+            off = int(SR * (span * k / coins + rng.uniform(0.0, 0.03)))
+            tw = fade_tail(render_tone(
+                ln, lambda t, fr=fq: fr * (1.0 + 0.03 * math.exp(-90.0 * t)),
+                0.125, decay(rng.uniform(60.0, 90.0))), 12.0)
+            mix_at(buf, tw, off, rng.uniform(0.5, 0.9))
+        tags = {"style": "loot jingle", "coins": coins,
+                "top_hz": int(round(midi(top))),
+                "spill": "tight" if span < 0.2 else "scattered"}
+
+    elif style == "chest_open":
+        # unlock clicks with metal pings, then a rising reveal swell + sparkles
+        clicks = rng.randint(2, 3)
+        buf = []
+        off = 0
+        ping = rng.uniform(1400.0, 2600.0)
+        for k in range(clicks):
+            mix_at(buf, noise_burst(int(SR * rng.uniform(0.008, 0.014)), 1, 260.0),
+                   off, 0.9 - 0.15 * k)
+            pg = render_tone(int(SR * 0.02), lambda t, f=ping * (0.85 ** k): f,
+                             0.125, decay(170.0))
+            mix_at(buf, pg, off, 0.5)
+            off += int(SR * rng.uniform(0.05, 0.09))
+        sw_dur = rng.uniform(0.2, 0.32)
+        sn = int(SR * sw_dur)
+        f0 = midi(rng.randint(64, 72))
+        sw = render_tone(
+            sn, lambda t, f=f0, d=sw_dur: f * 2.0 ** (t / d), 0.5,
+            lambda t, d=sw_dur: min(1.0, t / 0.04)
+            * min(1.0, max(0.0, (d - t) / (0.3 * d))), "tri")
+        mix_at(buf, sw, off, 0.7)
+        sparkles = rng.randint(2, 4)
+        for k in range(sparkles):
+            fq = midi(rng.randint(88, 97))
+            sp = fade_tail(render_tone(int(SR * 0.05), lambda t, fr=fq: fr, 0.125,
+                                       decay(55.0)), 10.0)
+            mix_at(buf, sp, off + int(sn * rng.uniform(0.4, 1.0)),
+                   rng.uniform(0.4, 0.7))
+        tags = {"style": "chest open", "clicks": clicks,
+                "ping_hz": int(round(ping)), "sparkles": sparkles,
+                "lock": "heavy" if ping < 1900.0 else "bright"}
+
+    elif style == "shield_block":
+        # a hit taken on the shield: ringing parry ting or a dull flat block
+        parry = rng.random() < 0.5
+        if parry:
+            fq = rng.uniform(1600.0, 2600.0)
+            rr = rng.uniform(14.0, 20.0)
+            n = int(SR * rng.uniform(0.18, 0.3))
+            buf = render_tone(
+                n, lambda t, fr=fq: fr * (1.0 + 0.04 * (1.0 - math.exp(-25.0 * t))),
+                0.125, decay(rr))
+            mix_at(buf, noise_burst(int(SR * 0.012), 1, 300.0), 0, 0.7)
+            sustain = "long ring" if rr < 17.0 else "quick mute"
+        else:
+            fq = rng.uniform(220.0, 380.0)
+            rr = rng.uniform(20.0, 30.0)
+            n = int(SR * rng.uniform(0.14, 0.22))
+            buf = render_tone(n, lambda t, fr=fq: fr, 0.5, decay(rr), "tri")
+            mix_at(buf, noise_burst(int(SR * 0.025), rng.randint(2, 4), 140.0), 0,
+                   rng.uniform(0.6, 0.9))
+            sustain = "long ring" if rr < 25.0 else "quick mute"
+        tags = {"style": "shield block",
+                "response": "parry ting" if parry else "flat block",
+                "hz": int(round(fq)), "sustain": sustain}
+
+    elif style == "trap_spring":
+        # the arming click, a beat of quiet, then the spring lets go
+        buf = noise_burst(int(SR * 0.01), 1, 280.0, rng.uniform(0.6, 0.9))
+        gap = int(SR * rng.uniform(0.05, 0.12))
+        f0 = rng.uniform(260.0, 480.0)
+        wob = rng.uniform(20.0, 42.0)
+        bn = int(SR * rng.uniform(0.25, 0.45))
+        boing = render_tone(
+            bn,
+            lambda t, f=f0, w=wob: f * (1.0 + 0.35 * math.exp(-6.0 * t)
+                                        * math.sin(2.0 * math.pi * w * t)),
+            0.25, decay(rng.uniform(8.0, 12.0)))
+        mix_at(buf, boing, gap)
+        snap_g = rng.uniform(0.4, 0.9)
+        mix_at(buf, noise_burst(int(SR * 0.02), rng.randint(1, 2), 200.0), gap,
+               snap_g)
+        tags = {"style": "trap spring", "boing_hz": int(round(f0)),
+                "wobble_hz": int(round(wob)),
+                "snap": "sharp" if snap_g > 0.65 else "soft"}
+
+    elif style == "teleport":
+        # warp: a sample-and-hold stepped gliss with a shimmering amp wobble
+        up = rng.random() < 0.6
+        f0 = rng.uniform(300.0, 600.0) if up else rng.uniform(1400.0, 2400.0)
+        span = rng.uniform(1.6, 2.8)
+        dur = rng.uniform(0.35, 0.6)
+        n = int(SR * dur)
+        st = rng.uniform(0.014, 0.025)
+        trem = rng.uniform(20.0, 45.0)
+        sgn = span if up else -span
+        buf = render_tone(
+            n,
+            lambda t, f=f0, s=sgn, d=dur, q=st:
+                f * 2.0 ** (s * (math.floor(t / q) * q) / d),
+            0.25,
+            lambda t, d=dur, tr=trem:
+                min(1.0, t / 0.03) * min(1.0, max(0.0, (d - t) / (0.2 * d)))
+                * (0.7 + 0.3 * math.sin(2.0 * math.pi * tr * t)))
+        tags = {"style": "teleport warp",
+                "direction": "rising" if up else "sinking",
+                "span_oct": round(span, 1), "start_hz": int(round(f0))}
+
+    elif style == "game_over":
+        # somber sting: a short fall of notes onto a low held tone
+        root = rng.randint(57, 64)
+        pat = rng.choice([[0, -1, -3, -8], [0, -3, -5, -12], [0, -2, -7],
+                          [0, -4, -7, -12], [0, -5, -11]])
+        wave = rng.choice(["tri", "sq"])
+        nl = rng.uniform(0.1, 0.16)
+        buf = []
+        off = 0
+        for k, iv in enumerate(pat):
+            fq = midi(root + iv)
+            last = k == len(pat) - 1
+            if last:
+                dn = int(SR * rng.uniform(0.3, 0.45))
+                vr = rng.uniform(4.0, 6.0)
+                nt = render_tone(
+                    dn,
+                    lambda t, fr=fq, v=vr:
+                        fr * (1.0 + 0.015 * math.sin(2.0 * math.pi * v * t)),
+                    0.5, decay(rng.uniform(7.0, 9.0)),
+                    "tri" if wave == "tri" else None)
+            else:
+                nt = render_tone(int(SR * nl), lambda t, fr=fq: fr, 0.5,
+                                 decay(9.0), "tri" if wave == "tri" else None)
+            mix_at(buf, nt, off)
+            off += int(SR * nl)
+        tags = {"style": "game-over sting", "notes": len(pat),
+                "end_hz": int(round(midi(root + pat[-1]))),
+                "wave": "triangle" if wave == "tri" else "square"}
+
+    else:  # save_chime
+        # gentle two-note triangle chime, sometimes with a soft echo repeat
+        m = rng.randint(82, 93)
+        iv = rng.choice([5, 7])
+        nl = rng.uniform(0.07, 0.1)
+        echo = rng.random() < 0.6
+        buf = []
+
+        def pair(gain, off):
+            a = render_tone(int(SR * nl), lambda t, f=midi(m): f, 0.5,
+                            decay(18.0), "tri")
+            b = fade_tail(render_tone(int(SR * rng.uniform(0.18, 0.26)),
+                                      lambda t, f=midi(m + iv): f, 0.5,
+                                      decay(rng.uniform(12.0, 18.0)), "tri"))
+            mix_at(buf, a, off, gain)
+            mix_at(buf, b, off + int(SR * nl), gain)
+
+        pair(1.0, 0)
+        if echo:
+            pair(rng.uniform(0.25, 0.45), int(SR * rng.uniform(0.16, 0.22)))
+        tags = {"style": "save chime", "hz": int(round(midi(m))),
+                "interval": "fifth" if iv == 7 else "fourth",
+                "echo": "soft echo" if echo else "dry"}
+
+    # clamp into the set's 0.1 - 1.5 s window
+    n_min = int(SR * 0.1)
+    n_max = int(SR * 1.5)
+    if len(buf) < n_min:
+        buf.extend([0.0] * (n_min - len(buf)))
+    elif len(buf) > n_max:
+        del buf[n_max:]
+
+    # hand-rolled one-pole DC blocker (narrow duties and long sweeps drift)
+    px = 0.0
+    py = 0.0
+    for i in range(len(buf)):
+        x = buf[i]
+        y = x - px + 0.995 * py
+        px = x
+        py = y
+        buf[i] = y
+
+    # de-click the head, fade the tail, normalize above the quantizer floor
+    hk = min(int(SR * 0.002), len(buf) // 2)
+    for i in range(hk):
+        buf[i] *= i / hk
+    tk = min(int(SR * 0.018), len(buf) // 2)
+    for i in range(tk):
+        buf[len(buf) - 1 - i] *= i / tk
+    peak = 0.0
+    for v in buf:
+        a = -v if v < 0.0 else v
+        if a > peak:
+            peak = a
+    if peak > 1e-9:
+        g = rng.uniform(0.75, 0.95) / peak
+        for i in range(len(buf)):
+            buf[i] *= g
+    rng.tags = tags
+    return buf
+
+
 CATEGORIES = {
     "jump": gen_jump,
     "coin": gen_coin,
@@ -2507,10 +3818,501 @@ CATEGORIES = {
     "fire": gen_fire,
     "footstep": gen_footstep,
     "mech": gen_mech,
+    "person": gen_person,
+    "rpg": gen_rpg,
 }
 
+# rpg mixes 76 generated staples with the 24 ported game sounds below, totalling 100
+COUNTS = {"rpg": 76}
 
-# --- the pixel-rpg set ----------------------------------------------------
+
+# --- descriptions ---------------------------------------------------------
+#
+# Every generator records its synthesis decisions in rng.tags; the describers
+# below turn those into short catalog blurbs so the manifest can say how each
+# effect differs from its neighbors without anyone having to audition all of
+# them. Descriptions are derived from the actual parameters — never invented.
+
+
+def _duty(d):
+    return {0.125: "12.5%", 0.25: "25%", 0.5: "50%"}.get(d, str(d))
+
+
+def describe_jump(tags):
+    return "upward square sweep — %s duty, %d Hz climbing %.1f octaves, %s tail" % (
+        _duty(tags["duty"]), tags["f0"], tags["sweep"], tags["snap"])
+
+
+def describe_coin(tags):
+    return "two-note pickup blip — %d Hz hopping up a %s at %d%%, %s duty, %.1f/s fade" % (
+        tags["root_hz"], tags["interval"], tags["split_pct"], _duty(tags["duty"]), tags["fade"])
+
+
+def describe_laser(tags):
+    return "%s falling zap — %d down to %d Hz, %s duty" % (
+        tags["wobble"], tags["from_hz"], tags["to_hz"], _duty(tags["duty"]))
+
+
+def describe_explosion(tags):
+    body = "dry" if tags["rumble_pct"] <= 25 else "%d%% sub-rumble" % tags["rumble_pct"]
+    return "noise boom — grit %d, %s %.1f/s fade, %s" % (
+        tags["grit"], tags["tail"], tags["fade"], body)
+
+
+def describe_powerup(tags):
+    return "rising %s arpeggio — %d steps from %d Hz, %s duty" % (
+        tags["flavor"], tags["steps"], tags["root_hz"], _duty(tags["duty"]))
+
+
+def describe_hit(tags):
+    return "%s impact — %d Hz thud under the burst, %s duty" % (
+        tags["balance"], tags["thud_hz"], _duty(tags["duty"]))
+
+
+def describe_blip(tags):
+    return "single UI tick at %d Hz, %s duty square, %d/s fade" % (
+        tags["hz"], _duty(tags["duty"]), tags["fade"])
+
+
+def describe_alarm(tags):
+    return "%s two-tone siren — %d and %d Hz every %d ms, %s duty" % (
+        tags["pace"], tags["low_hz"], tags["high_hz"], tags["cycle_ms"], _duty(tags["duty"]))
+
+
+def describe_drone(tags):
+    return "low %s hum at %d Hz — %s %.1f Hz wobble" % (
+        tags["wave"], tags["hz"], tags["depth"], tags["wobble_hz"])
+
+
+def describe_jingle(tags):
+    return "%d-note stinger from %d Hz resolving up at %d Hz, %s duty" % (
+        tags["notes"], tags["root_hz"], tags["resolve_hz"], _duty(tags["duty"]))
+
+
+def describe_ambient(tags):
+    style = tags.get("style", "ambient")
+    if style == "wind":
+        return "gusting wind bed — %d %s swells over a %s hiss" % (
+            tags.get("gusts", 2), tags.get("swell", "gentle"), tags.get("bed", "calm"))
+    if style == "crickets":
+        return "night cricket chorus — %d voices, %s chirps, lead near %d Hz" % (
+            tags.get("voices", 2), tags.get("chirp", "lazy"), tags.get("lead_hz", 3000))
+    if style == "drips":
+        return "cave drip echoes — %d plinks on a %s rumble, %d ms echo tail" % (
+            tags.get("drops", 2), tags.get("bed", "faint"), tags.get("echo_ms", 200))
+    if style == "thunder":
+        return "distant thunder roll — %s attack, %s rumble, %d Hz throb" % (
+            tags.get("attack", "rolling"), tags.get("grain", "crunchy"),
+            tags.get("throb_hz", 35))
+    if style == "rain":
+        return "steady rain patter — %s drops near %d per second, %s hiss" % (
+            tags.get("patter", "sparse"), tags.get("drops_sec", 100),
+            tags.get("tone", "muffled"))
+    if style == "shimmer":
+        return "eerie shimmer pad — triangles beating at %d Hz, %s beat, %d sparkle blips" % (
+            tags.get("root_hz", 440), tags.get("beat", "slow"), tags.get("sparkles", 4))
+    return "ambient environmental bed — %s texture" % style
+
+
+def describe_ui(tags):
+    style = tags.get("style", "ui")
+    if style == "click":
+        return ("mouse click — %s pulse chirp falling from %d Hz, %s attack"
+                % (tags["tone"], tags["pitch_hz"], tags["attack"]))
+    if style == "hover":
+        return ("soft hover blip — triangle at %d Hz, %s upward glide, %s fade"
+                % (tags["pitch_hz"], tags["glide"], tags["fade"]))
+    if style == "toggle":
+        return ("toggle switch — %s %d-semitone flick at %d Hz, %s voice"
+                % (tags["direction"], tags["interval"], tags["note_hz"],
+                   tags["timbre"]))
+    if style == "ding":
+        return ("notification ding — %s pair at %d Hz beating %.1f Hz, %s tail"
+                % (tags["timbre"], tags["pitch_hz"], tags["beat_hz"],
+                   tags["finish"]))
+    if style == "error":
+        burst = "double burst" if tags["bursts"] == 2 else "single burst"
+        return ("error buzz — %s pulse at %d Hz, %s, %s pitch"
+                % (tags["tone"], tags["buzz_hz"], burst, tags["droop"]))
+    if style == "success":
+        return ("success chime — %s arpeggio, %d rising notes from %d Hz, %s voice"
+                % (tags["flavor"], tags["notes"], tags["root_hz"], tags["timbre"]))
+    if style == "type":
+        if "thock_hz" in tags:
+            return ("keyboard tick — %s noise snap at %d/s with a %d Hz thock"
+                    % (tags["texture"], tags["decay_rate"], tags["thock_hz"]))
+        return ("keyboard tick — %s noise snap at %d/s, dry body"
+                % (tags["texture"], tags["decay_rate"]))
+    if style == "scroll":
+        return ("scroll blip — %s %d-step pitch staircase from %d Hz, %s pulse"
+                % (tags["direction"], tags["steps"], tags["start_hz"],
+                   tags["tone"]))
+    # unknown style: still deterministic, never raises
+    extras = ", ".join(str(tags[k]) for k in sorted(tags) if k != "style")
+    text = ("%s ui cue — %s" % (style, extras)) if extras else ("%s ui cue" % style)
+    return (text + " (chip ui one-shot)")[:95] if len(text) < 30 else text[:95]
+
+
+def describe_voice(tags):
+    style = tags.get("style")
+    hz = tags.get("pitch_hz")
+    if style == "babble":
+        return "chip-speech babble — {} {} Hz voice, {} delivery, {}-syllable run".format(
+            tags.get("register"), hz, tags.get("pace"), tags.get("syllables"))
+    if style == "grunt":
+        return "throaty grunt — {} {} Hz pitch-drop, {} beating rasp".format(
+            tags.get("register"), hz, tags.get("texture"))
+    if style == "hum":
+        return "melodic hum — {} {} Hz triangle drone, {} vibrato, {}-note phrase".format(
+            tags.get("register"), hz, tags.get("vibrato"), tags.get("notes"))
+    if style == "laugh":
+        return "chiptune laugh — {}x {} ha-bursts from {} Hz in a {} descent".format(
+            tags.get("bursts"), tags.get("timbre"), hz, tags.get("descent"))
+    if style == "gasp":
+        return "sharp gasp — {} inhale with an airy {}-register rise of {} oct from {} Hz".format(
+            tags.get("attack"), tags.get("register"), tags.get("rise_oct"), hz)
+    if style == "sigh":
+        return "weary sigh — {} {} Hz glide falling {} oct, {} vibrato and breath".format(
+            tags.get("register"), hz, tags.get("fall_oct"), tags.get("vibrato"))
+    if style == "hey":
+        return "chip 'hey!' shout — {} {} register at {} Hz, {}-semitone leap".format(
+            tags.get("timbre"), tags.get("register"), hz, tags.get("jump_semi"))
+    return "chip voice effect — {} style around {} Hz".format(style, hz)
+
+
+def describe_dog(tags):
+    def cw(n):
+        return {1: "single", 2: "double", 3: "triple", 4: "quadruple"}.get(n, "%dx" % n)
+
+    style = tags.get("style", "unknown")
+    if style == "bark_small":
+        return "small-dog bark — %s %s Hz snap, %s wuf" % (
+            tags.get("timbre", "nasal"), tags.get("pitch_hz", 0), cw(tags.get("barks", 1)))
+    if style == "bark_big":
+        return "big-dog bark — %s %s Hz chest woof, %s blast" % (
+            tags.get("register", "gruff"), tags.get("pitch_hz", 0), cw(tags.get("barks", 1)))
+    if style == "yip":
+        return "puppy yip — %s chirp from %s Hz, %s sweep, %s yap" % (
+            tags.get("timbre", "nasal"), tags.get("pitch_hz", 0),
+            tags.get("sweep", "narrow"), cw(tags.get("yips", 1)))
+    if style == "whine":
+        return "pleading whine — %s %s Hz tone, %s pitch arc, %s vibrato" % (
+            tags.get("voice", "smooth"), tags.get("pitch_hz", 0),
+            tags.get("arc", "gentle"), tags.get("vibrato", "subtle"))
+    if style == "whimper":
+        return "sad whimper — %s falling sobs near %s Hz, %s drop" % (
+            cw(tags.get("sobs", 2)), tags.get("pitch_hz", 0), tags.get("fall", "shallow"))
+    if style == "growl":
+        return "menacing growl — %s %s Hz rumble, %s throat tremolo" % (
+            tags.get("texture", "coarse"), tags.get("pitch_hz", 0), tags.get("tremolo", "slow"))
+    if style == "pant":
+        return "happy pant — %s huff-puff rhythm, %s breaths" % (
+            tags.get("tone", "airy"), tags.get("breaths", 3))
+    if style == "howl":
+        return "moonlit howl — %s rise of %s oct from %s Hz, %s voice" % (
+            tags.get("voice", "mellow"), tags.get("sweep_oct", 0.5),
+            tags.get("start_hz", 0), tags.get("chorus", "single"))
+    return "%s chip-dog vocalization, seed-varied 8-bit character" % style
+
+
+def describe_zombie(tags):
+    style = tags['style']
+    if style == 'groan':
+        return (f"low zombie groan — {tags['voice']} pulse, {tags['breathiness']}, "
+                f"{tags['pitch_hz']} Hz sagging {tags['sag_pct']}%")
+    if style == 'moan':
+        return (f"arcing zombie moan — {tags['voice']} voice, {tags['rise']} rise, "
+                f"{tags['vibrato']} vibrato, {tags['pitch_hz']} Hz base")
+    if style == 'hiss':
+        puffs = 'double puff' if tags['puffs'] == 2 else 'single puff'
+        return (f"dry throat hiss — {tags['tone']} noise, {tags['attack']} attack, "
+                f"{puffs}, fluttering at {tags['flutter_hz']} Hz")
+    if style == 'gurgle':
+        return (f"wet throat gurgle — {tags['texture']} crunch, {tags['underlay']} bed, "
+                f"wobbling at {tags['wobble_hz']} Hz")
+    if style == 'rattle':
+        return (f"rattling zombie breath — {tags['gate']} {tags['pace']} gate, "
+                f"{tags['undertone']} undertone, {tags['rattle_hz']} Hz chop")
+    if style == 'duet':
+        return (f"detuned groan duet — {tags['timbre']} pulses, {tags['glide']} pitch, "
+                f"{tags['detune_cents']} cents apart at {tags['pitch_hz']} Hz")
+    return (f"aggressive snarl bark — {tags['bite']}, {tags['drop']} pitch drop, "
+            f"{tags['rasp_hz']} Hz rasp on {tags['pitch_hz']} Hz")
+
+
+def describe_monster(tags):
+    style = tags.get("style")
+    if style == "roar":
+        return "deep chest roar — %d Hz under %d Hz %s growl, %s pitch" % (
+            tags["base_hz"], tags["growl_hz"], tags["growl"], tags["sag"])
+    if style == "screech":
+        if tags["contour"] == "breaking":
+            return "piercing screech — %d Hz breaking against %d Hz, %s wobble" % (
+                tags["base_hz"], tags["alt_hz"], tags["wobble"])
+        return "piercing screech — unbroken %d Hz arc, %s wobble" % (
+            tags["base_hz"], tags["wobble"])
+    if style == "snarl":
+        return "low ragged snarl — %d Hz %s flutter, %s gate chew, %s contour" % (
+            tags["base_hz"], tags["flutter"], tags["gate"], tags["contour"])
+    if style == "chitter":
+        return "insectoid chitter — %d %s blips around %d Hz, %s phrase" % (
+            tags["blips"], tags["wave"], tags["base_hz"], tags["drift"])
+    if style == "stomp":
+        return "heavy footfall — %s stomp, thud swept %d down to %d Hz, %s debris" % (
+            "double" if tags["hits"] == 2 else "single",
+            tags["from_hz"], tags["to_hz"], tags["debris"])
+    if style == "flap":
+        return "wing-beat flapping — %d %s whooshes, %s %d Hz thrum underneath" % (
+            tags["beats"], tags["pace"], tags["undertone"], tags["thrum_hz"])
+    # squelch
+    return "slime squelch — %d Hz falling gliss, %s wobble, %s splat, %d bubbles" % (
+        tags["base_hz"], tags["wobble"], tags["splat"], tags["bubbles"])
+
+
+def describe_water(tags):
+    style = tags.get("style", "")
+    if style == "drip":
+        tail = ("faint echoing double" if tags.get("echo") == "echoing"
+                else "lone single drop")
+        return (f"cave drip — {tags.get('plip_hz', 0)} Hz plip rising "
+                f"{tags.get('rise', 0)}x, {tail}")
+    if style == "small_splash":
+        s = tags.get("sprays", 0)
+        spray = f"{s} spray droplet" + ("" if s == 1 else "s")
+        return (f"small splash — {tags.get('texture', 'soft')} wash, "
+                f"{tags.get('thunk_hz', 0)} Hz thunk, {spray}")
+    if style == "big_splash":
+        return (f"big splash — {tags.get('thump_hz', 0)} Hz body thump, "
+                f"{tags.get('slosh', 'single hit')}, "
+                f"{tags.get('drops', 0)} rain-back drops")
+    if style == "pour":
+        g = tags.get("glugs", 0)
+        glug = f"{g} glug" + ("" if g == 1 else "s")
+        return (f"steady pour — {tags.get('body', 'muffled')} gurgling column, "
+                f"{tags.get('wobble_hz', 0)} Hz sway, {glug}")
+    if style == "stream":
+        return (f"babbling stream — {tags.get('bed', 'fine')} noise bed, "
+                f"{tags.get('sway_hz', 0)} Hz sway, {tags.get('bloops', 0)} bloops")
+    if style == "dive":
+        d = tags.get("drops", 0)
+        drop = f"{d} after-drop" + ("" if d == 1 else "s")
+        return (f"dive splashdown — {tags.get('whistle_hz', 0)} Hz falling "
+                f"whistle, {tags.get('duty', 'full')} duty, {drop}")
+    if style == "blub":
+        bed = ("over a muffled deep bed" if tags.get("bed") == "bedded"
+               else "with no bed underneath")
+        return (f"underwater blubs — {tags.get('blubs', 0)} wobbly glubs near "
+                f"{tags.get('base_hz', 0)} Hz, {bed}")
+    return "chip-tone water texture — unspecified splash variant"
+
+
+def describe_fire(tags):
+    def cnt(n, word):
+        return f"{n} {word}" if n == 1 else f"{n} {word}s"
+
+    style = tags.get('style', 'fire')
+    if style == 'campfire':
+        return (f"campfire crackle bed — {tags.get('texture', 'crisp')} grain, "
+                f"{tags.get('density', 'scattered')} spread, "
+                f"{cnt(tags.get('pops', 4), 'stray pop')}")
+    if style == 'ignition':
+        return (f"ignition whoosh — {tags.get('attack', 'fast')} swell, "
+                f"{tags.get('rumble_hz', 80)} Hz rising rumble, "
+                f"{cnt(tags.get('pops', 2), 'late pop')}")
+    if style == 'torch':
+        return (f"torch flame flutter — {tags.get('wobble', 'gentle')} "
+                f"{tags.get('flutter_hz', 12)} Hz wobble over a "
+                f"{tags.get('drone_hz', 70)} Hz drone")
+    if style == 'sizzle':
+        return (f"frying sizzle — {tags.get('gating', 'patchy')} micro-gate hiss, "
+                f"{tags.get('heat', 'steady')} heat, "
+                f"{cnt(tags.get('pops', 3), 'oil spit')}")
+    if style == 'pops':
+        return (f"explosive fire pops — {cnt(tags.get('bursts', 3), 'heavy burst')} "
+                f"over a {tags.get('bed', 'faint')} crackle bed")
+    if style == 'ember':
+        return (f"glowing ember bed — {tags.get('texture', 'gritty')} grain, "
+                f"{tags.get('glow', 'dim')} flicker, "
+                f"{cnt(tags.get('ticks', 3), 'tiny tick')}")
+    if style == 'flare':
+        return (f"flare-up burst — {tags.get('peak', 'late')} peak, "
+                f"{tags.get('growl', 'hollow')} {tags.get('growl_hz', 300)} Hz "
+                f"down-swept growl")
+    return f"{style} fire effect — unclassified crackle-and-hiss variant"
+
+
+def describe_footstep(tags):
+    style = tags['style']
+    if style == 'grass':
+        return ("grass-swish step — %s hiss, %s, %d ms attack"
+                % (tags['texture'], tags['drag'], tags['attack_ms']))
+    if style == 'gravel':
+        return ("gravel-crunch step — %s thud, %s body, %d scattered ticks"
+                % (tags['thud'], tags['body'], tags['ticks']))
+    if style == 'stone':
+        return ("stone-clack step — %s attack, %s %d Hz impact tick"
+                % (tags['clack'], tags['tick'], tags['tick_hz']))
+    if style == 'wood':
+        return ("wood-plank step — %s %d Hz knock, %s overtone, %s"
+                % (tags['register'], tags['knock_hz'], tags['overtone'], tags['taps']))
+    if style == 'snow':
+        return ("snow-crunch step — %s grain, %s crackle clusters near %d Hz"
+                % (tags['texture'], tags['contrast'], tags['crackle_hz']))
+    if style == 'mud':
+        return ("mud-squish step — %s squelch, %s wobble on a sinking %d Hz tone"
+                % (tags['weight'], tags['wobble'], tags['tone_hz']))
+    return ("puddle-splash step — %s spray, %s %d Hz bloop rising %.1f oct"
+            % (tags['splash'], tags['bloop'], tags['bloop_hz'], tags['rise_oct']))
+
+
+def describe_mech(tags):
+    style = tags.get("style", "mech")
+    if style == "creak":
+        return (f"hinge creak — {tags.get('motion', 'wavering')} squeal around "
+                f"{tags.get('pitch_hz', 0)} Hz, {tags.get('texture', 'hollow')} tone, "
+                f"{tags.get('drift_oct', 0.0)} oct drift")
+    if style == "slam":
+        return (f"door slam — {tags.get('weight', 'heavy')} {tags.get('thud_hz', 0)} Hz "
+                f"thud into crunch, {tags.get('frame', 'clean')} frame")
+    if style == "latch":
+        return (f"chest latch — double click {tags.get('gap_ms', 0)} ms apart, "
+                f"{tags.get('rise', 'gentle')} {tags.get('squeak_hz', 0)} Hz squeak, "
+                f"{tags.get('vibrato', 'slow')} vibrato")
+    if style == "lever":
+        return (f"lever throw — {tags.get('throw', 'short')} scrape into "
+                f"{tags.get('stop', 'ringing')} {tags.get('clunk_hz', 0)} Hz clunk")
+    if style == "switch":
+        return (f"toggle switch — {tags.get('action', 'single click')} at "
+                f"{tags.get('click_hz', 0)} Hz, {tags.get('brightness', 'crisp')} tick")
+    if style == "rattle":
+        return (f"gate rattle — {tags.get('hits', 0)} {tags.get('register', 'mid')} "
+                f"clatters near {tags.get('ping_hz', 0)} Hz, "
+                f"{tags.get('pace', 'loose')} shaking")
+    if style == "ratchet":
+        tail = ("over a faint strain drone"
+                if tags.get("undertone") == "droning" else "dry mechanism")
+        return (f"winch ratchet — {tags.get('clicks', 0)} "
+                f"{tags.get('motion', 'steady')} pawl ticks at "
+                f"{tags.get('tick_hz', 0)} Hz, {tail}")
+    if style == "keys":
+        return (f"key-ring jangle — {tags.get('pings', 0)} detuned pings in a "
+                f"{tags.get('density', 'sparse')} {tags.get('shake', 'quick')} shake")
+    return f"{style} mechanism — chip-style object sfx with mixed clicks and tones"
+
+
+def describe_person(tags):
+    s = tags["style"]
+    if s == "heartbeat":
+        return "heartbeat lub-dub — %s %d Hz thump, %d beat%s at %d bpm" % (
+            tags["depth"], tags["thump_hz"], tags["beats"],
+            "" if tags["beats"] == 1 else "s", tags["bpm"])
+    if s == "breath":
+        return "%s breathing — %d gusts of %s %d Hz chip air" % (
+            tags["mode"], tags["gusts"], tags["tone"], tags["air_hz"])
+    if s == "sneeze":
+        return "chip sneeze — %s wind-up into a %d Hz noise burst, %s kick" % (
+            tags["buildup"], tags["burst_hz"], tags["kick"])
+    if s == "cough":
+        if tags["kind"] == "chesty":
+            return "chesty cough — %d bark%s rattling at %d Hz, %s phlegmy grit" % (
+                tags["barks"], "" if tags["barks"] == 1 else "s",
+                tags["rattle_hz"], tags["grit"])
+        return "dry cough — %d sharp bark%s over a %d Hz chest thud, %s grit" % (
+            tags["barks"], "" if tags["barks"] == 1 else "s",
+            tags["thud_hz"], tags["grit"])
+    if s == "snore":
+        return "snore cycle — %s %d Hz rattle over %d Hz air, %s exhale" % (
+            tags["depth"], tags["rattle_hz"], tags["air_hz"], tags["exhale"])
+    if s == "yawn":
+        return "stretching yawn — %s swell cresting %s, %d Hz airflow falling %.1f octaves" % (
+            tags["air"], tags["crest"], tags["sag_hz"], tags["fall_oct"])
+    if s == "gulp":
+        return "gulp swallow — %s glug dropping from %d Hz, %s onset" % (
+            tags["size"], tags["start_hz"], tags["onset"])
+    if s == "chew":
+        return "chewing — %d %s bite%s at a %s %d ms munch" % (
+            tags["bites"], tags["texture"],
+            "" if tags["bites"] == 1 else "s", tags["pace"], tags["gap_ms"])
+    if s == "clap":
+        return "single clap — %d ms %s burst, %s room" % (
+            tags["burst_ms"], tags["grit"], tags["room"])
+    if s == "applause":
+        return "applause patter — %d scattered claps, %s arc, %s crowd" % (
+            tags["claps"], tags["arc"], tags["crowd"])
+    if s == "snap":
+        return "finger snap — %s %d Hz ping over a dry click, %s tail" % (
+            tags["tone"], tags["ping_hz"], tags["tail"])
+    if s == "shiver":
+        return "teeth-chatter shiver — %d Hz train of %d %s ticks, %s tremble" % (
+            tags["rate_hz"], tags["ticks"], tags["grit"], tags["tremble"])
+    return "stomach growl — %s %d Hz rumble with %d bubble%s rising" % (
+        tags["mood"], tags["base_hz"], tags["bubbles"],
+        "" if tags["bubbles"] == 1 else "s")
+
+
+def describe_rpg(tags):
+    s = tags.get("style", "rpg effect")
+    if s == "sword swing":
+        swipe = "double swipe" if tags["swipes"] == 2 else "single swipe"
+        return "sword swing — %s arc, %s, blade whistle off %d Hz" % (
+            tags["arc"], swipe, tags["whistle_hz"])
+    if s == "metal clash":
+        return "metal clash — %d Hz clang, %s ring, %s attack" % (
+            tags["clang_hz"], tags["ring"], tags["attack"])
+    if s == "bow shot":
+        flight = "thuds home" if tags["arrow"] == "thunk" else "zips past"
+        return "bow shot — %s string twang at %d Hz, arrow %s" % (
+            tags["string"], tags["twang_hz"], flight)
+    if s == "fire spell":
+        return "fire spell — %s %s, %d crackles, %d Hz roar under it" % (
+            tags["body"], tags["surge"], tags["crackles"], tags["roar_hz"])
+    if s == "ice spell":
+        return "ice spell — %d %s shards chiming down from %d Hz" % (
+            tags["shards"], tags["glint"], tags["top_hz"])
+    if s == "arcane zap":
+        return "arcane zap — %s buzz diving %.1f octaves from %d Hz" % (
+            tags["buzz"], tags["fall_oct"], tags["from_hz"])
+    if s == "buff shimmer":
+        return "buff shimmer — %s tremolo lifting %.1f octaves from %d Hz" % (
+            tags["tremolo"], tags["rise_oct"], tags["base_hz"])
+    if s == "potion glug":
+        return "potion glug — %d %s gulps stepping up from %d Hz" % (
+            tags["glugs"], tags["pour"], tags["start_hz"])
+    if s == "level-up fanfare":
+        return "level-up fanfare — %d-note major climb from %d Hz, %s" % (
+            tags["notes"], tags["root_hz"], tags["finish"])
+    if s == "quest stinger":
+        return "quest stinger — %s pickup into a %d-note chord roll on %d Hz" % (
+            tags["voice"], tags["chord"], tags["root_hz"])
+    if s == "loot jingle":
+        return "loot jingle — %d coins, %s spill, tinkling up to %d Hz" % (
+            tags["coins"], tags["spill"], tags["top_hz"])
+    if s == "chest open":
+        return "chest open — %d-click %s unlock, %d Hz ping, %d-sparkle reveal" % (
+            tags["clicks"], tags["lock"], tags["ping_hz"], tags["sparkles"])
+    if s == "shield block":
+        return "shield block — %s at %d Hz, %s" % (
+            tags["response"], tags["hz"], tags["sustain"])
+    if s == "trap spring":
+        return "trap spring — %s trigger click, %d Hz boing wobbling at %d Hz" % (
+            tags["snap"], tags["boing_hz"], tags["wobble_hz"])
+    if s == "teleport warp":
+        return "teleport warp — %s stepped gliss, %.1f octaves from %d Hz" % (
+            tags["direction"], tags["span_oct"], tags["start_hz"])
+    if s == "game-over sting":
+        return "game-over sting — %d %s notes sinking to %d Hz" % (
+            tags["notes"], tags["wave"], tags["end_hz"])
+    if s == "save chime":
+        return "save chime — %s up from %d Hz, %s" % (
+            tags["interval"], tags["hz"], tags["echo"])
+    extra = ", ".join("%s %s" % (k, tags[k]) for k in sorted(tags) if k != "style")
+    return "%s — %s" % (s, extra) if extra else "%s effect" % s
+
+
+DESCRIBERS = {name: globals()["describe_" + name] for name in CATEGORIES}
+
+
+# --- the ported pixel-rpg set (the labeled half of the "rpg" category) ----
 #
 # An exact port of pixel-rpg's src/audio/sfx.js SOUNDS table and its Web Audio
 # engine semantics (src/audio/engine.js): tone segments are square/triangle/
@@ -2621,6 +4423,34 @@ PIXELRPG_SOUNDS = {
 }
 
 
+PIXELRPG_DESCRIPTIONS = {
+    "step-person": "the person's footstep — a soft noise tick swept 750 down to 420 Hz",
+    "step-dog": "the dog's lighter, brighter step tick, 1400 down to 900 Hz",
+    "caption": "two-note square dialog blip, 660 then 880 Hz",
+    "whimper": "drooping two-bend triangle whimper — the dog's hint call",
+    "menu-open": "rising three-note triangle chime for opening a menu",
+    "menu-move": "single 880 Hz square tick for cursor movement",
+    "menu-confirm": "two-note square confirm, 660 into 990 Hz",
+    "roll": "dice rattle — three falling noise chits and a 1320 Hz landing ping",
+    "damage": "square hurt drop, 220 falling to 96 Hz",
+    "heal": "gentle rising triangle triad, C5 E5 G5",
+    "collapse": "long sawtooth fall 440 to 52 Hz over sinking noise — going down",
+    "swap": "square down-up flip, 440-233 then 233-466 Hz — trading bodies",
+    "throw": "rising noise whoosh 400 to 1900 Hz — the ball leaves the hand",
+    "pickup": "quick square up-blip 988 to 1175 Hz — the ball is caught",
+    "deliver": "four-note square arpeggio C E G C — GOOD DOG",
+    "meet": "the meeting fanfare — four rising triangle notes G C E G",
+    "inflatables": "wobbling triangle down-up-down bends around 330-494 Hz",
+    "genie": "stepped triangle rise into a 659-880 Hz swell — smoke billows",
+    "vision": "three slow up-bending triangle pairs — the psychedelic vision",
+    "vanish": "two upward square zips, 1200-2400 and 800-1600 Hz — static out",
+    "zombie": "low sawtooth groan 95 to 62 Hz over a dark noise rasp",
+    "bonk": "blunt noise thump with a 150-110 Hz triangle knock — the bone lands",
+    "eat": "two noise chomps and a happy 523-659 Hz triangle uptick",
+    "drunk": "three woozy triangle bends drifting around 440 Hz — the room sways",
+}
+
+
 def render_segments(segments):
     """Render one pixel-rpg sound (a list of tone/noise segments) to samples."""
     total = max(seg.get("t", 0.0) + seg["d"] for seg in segments) + 0.05
@@ -2691,8 +4521,8 @@ def effect_name(category, idx):
     return "%s_%03d" % (category, idx)
 
 
-def generate_pixelrpg(out_root, only=None):
-    """Render the ported pixel-rpg set; returns manifest entries.
+def generate_rpg_ported(out_root, only=None):
+    """Render the ported pixel-rpg sounds into the rpg category.
 
     Each entry carries "gain": the sound's pre-normalization peak relative to
     the loudest sound in the set — playing wavs scaled by it restores the
@@ -2701,7 +4531,7 @@ def generate_pixelrpg(out_root, only=None):
     if only is not None:
         unknown = [l for l in only if l not in PIXELRPG_SOUNDS]
         if unknown:
-            sys.exit("unknown effect: pixelrpg_%s" % unknown[0])
+            sys.exit("unknown effect: rpg_%s" % unknown[0])
     rendered = []
     for label, segments in PIXELRPG_SOUNDS.items():
         if only is not None and label not in only:
@@ -2712,16 +4542,17 @@ def generate_pixelrpg(out_root, only=None):
     # spot-check writes the same bytes/metadata as a full run
     set_peak = max(render_segments(s)[1] for s in PIXELRPG_SOUNDS.values())
     entries = []
-    cat_dir = os.path.join(out_root, "pixelrpg")
+    cat_dir = os.path.join(out_root, "rpg")
     for label, samples, peak in rendered:
         os.makedirs(cat_dir, exist_ok=True)
         frames = quantize(samples, levels=0)
-        name = "pixelrpg_" + label
+        name = "rpg_" + label
         write_wav(os.path.join(cat_dir, name + ".wav"), frames)
         entries.append({
-            "file": "pixelrpg/%s.wav" % name,
-            "category": "pixelrpg",
+            "file": "rpg/%s.wav" % name,
+            "category": "rpg",
             "label": label,
+            "description": PIXELRPG_DESCRIPTIONS[label],
             "gain": round(peak / set_peak, 3),
             "duration_s": round(len(frames) / SR, 3),
             "sample_rate": SR,
@@ -2735,6 +4566,7 @@ def generate_one(out_root, category, idx):
     name = effect_name(category, idx)
     rng = Rng(name)
     frames = quantize(CATEGORIES[category](rng))
+    description = DESCRIBERS[category](rng.tags)  # every generator must set rng.tags
     cat_dir = os.path.join(out_root, category)
     os.makedirs(cat_dir, exist_ok=True)
     path = os.path.join(cat_dir, name + ".wav")
@@ -2742,6 +4574,7 @@ def generate_one(out_root, category, idx):
     return {
         "file": "%s/%s.wav" % (category, name),
         "category": category,
+        "description": description,
         "duration_s": round(len(frames) / SR, 3),
         "sample_rate": SR,
         "bits": 8,
@@ -2758,22 +4591,24 @@ def main(argv):
 
     if args.only:
         for name in args.only:
-            if name.startswith("pixelrpg_"):
-                generate_pixelrpg(args.out, only=[name[len("pixelrpg_"):]])
-                continue
             category, _, idx = name.rpartition("_")
-            if category not in CATEGORIES or not idx.isdigit():
+            if category == "rpg" and not idx.isdigit():
+                generate_rpg_ported(args.out, only=[idx])
+                continue
+            count = COUNTS.get(category, VARIATIONS)
+            if category not in CATEGORIES or not idx.isdigit() or int(idx) >= count:
                 sys.exit("unknown effect: %s" % name)
             generate_one(args.out, category, int(idx))
         return
 
     entries = []
     for category in CATEGORIES:
-        for idx in range(VARIATIONS):
+        count = COUNTS.get(category, VARIATIONS)
+        for idx in range(count):
             entries.append(generate_one(args.out, category, idx))
-        print("generated %s (%d)" % (category, VARIATIONS))
-    entries.extend(generate_pixelrpg(args.out))
-    print("generated pixelrpg (%d, ported from cportka/pixel-rpg)" % len(PIXELRPG_SOUNDS))
+        print("generated %s (%d)" % (category, count))
+    entries.extend(generate_rpg_ported(args.out))
+    print("generated rpg ported set (%d, from cportka/pixel-rpg)" % len(PIXELRPG_SOUNDS))
     pkg = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "package.json")
     try:
         with open(pkg) as f:

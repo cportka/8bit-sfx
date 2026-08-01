@@ -1,7 +1,7 @@
 {
   "name": "8bit-sfx",
-  "version": "0.3.0",
-  "description": "2000+ free, deterministic, procedurally generated 8-bit sound effects (WAV) with a tiny dependency-free JS API for browsers and Node.",
+  "version": "0.4.0",
+  "description": "2200 free, deterministic, procedurally generated 8-bit sound effects (WAV) with per-effect catalog descriptions and a tiny dependency-free JS API for browsers and Node.",
   "type": "module",
   "main": "src/index.js",
   "exports": {
