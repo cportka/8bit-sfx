@@ -1,6 +1,6 @@
 # 8bit-sfx
 
-**Version:** 0.4.0
+**Version:** 0.4.1
 
 A free 8-bit sound effects library and npm package: **2200 effects** across 22 categories
 — including the complete ported sound set of

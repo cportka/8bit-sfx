@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows Keep
 (https://keepachangelog.com) and the project uses Semantic Versioning (https://semver.org).
 Every change bumps the version and adds an entry below.
 
+## [0.4.1] - 2026-08-01
+
+### Added
+- Funding metadata: `.github/FUNDING.yml` (GitHub Sponsors, Buy Me a Coffee, Venmo,
+  BTC/ETH) and the matching `funding` field in `package.json`, which npm surfaces via
+  `npm fund` once the package is published.
+
+### Fixed
+- `docs/npm-package-info.md`: the publish guide now covers npm's `E403 … Two-factor
+  authentication or granular access token with bypass 2fa enabled is required` refusal —
+  the registry requires 2FA on the account (or a granular token with 2FA bypass) before
+  any publish; documented both remedies step by step. A publish that failed with E403
+  did not consume the version number.
+
+### Changed
+- Testing page: category chips now show just the category name, and the selected
+  category (or a search) renders as a clean table — play button, effect name,
+  full-width readable description, duration — instead of button soup. Clicking a
+  category no longer auto-plays a random sample.
+
 ## [0.4.0] - 2026-07-30
 
 ### Added
