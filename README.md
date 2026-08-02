@@ -1,97 +1,154 @@
 # 8bit-sfx
 
-**Version:** 0.4.1
+**Version:** 1.0.0
 
-A free 8-bit sound effects library and npm package: **2200 effects** across 22 categories
-— including the complete ported sound set of
-[pixel-rpg](https://github.com/cportka/pixel-rpg) inside the `rpg` category — all
-synthesized NES-style (square and triangle waves, 15-bit LFSR noise, 16-level amplitude
-quantization) as 8-bit unsigned mono WAV at 22050 Hz. **Every effect carries a catalog
-description in the manifest** derived from its actual synthesis parameters, so you can
-find the sound you want by reading, not auditioning. MIT licensed — use them in anything.
+**8888 chip sound effects across 44 categories — synthesized on demand, not downloaded.**
+There are no audio files in this package. Every effect is a deterministic function of its
+name, so `render('kick_003')` produces the same samples in a browser, in Node, today and
+in five years. Game SFX *and* musical sound design, every effect carrying a catalog
+description so you can find what you need by reading instead of auditioning.
+MIT licensed — use them in anything.
 
-**Try them: <https://cportka.github.io/8bit-sfx/>** — a testing page (GitHub Pages, deployed
-from `main`) that browses every category and plays effects in the browser.
+**Try them: <https://cportka.github.io/8bit-sfx/>** — the whole library, synthesized live
+in your browser as you click.
 
 ## Install & use
 
 ```sh
-npm install 8bit-sfx        # or: npm install github:cportka/8bit-sfx
+npm install 8bit-sfx
 ```
 
 ```js
-import { SfxPlayer, loadManifest, soundUrl } from '8bit-sfx';
+import { SfxPlayer, render, renderWav, describe, effectNames } from '8bit-sfx';
 
+// Play — no preloading, no fetching, nothing to bundle
 const sfx = new SfxPlayer();
-button.addEventListener('click', async () => {
-  sfx.resume();                        // browsers gate audio on a user gesture
-  await sfx.load('coin_042', 'jump_007', 'dog_013');
-  sfx.play('coin_042', { volume: 0.8, rate: 1.0 });
+button.addEventListener('click', () => {
+  sfx.resume();              // browsers gate audio on a user gesture
+  sfx.play('kick_003');      // synthesized on first use, then cached
+  sfx.play('bass_120', { volume: 0.8, rate: 1.0 });
 });
 
-const manifest = await loadManifest(); // every effect + category + duration
-const url = soundUrl('zombie_031');    // direct URL to the wav (browser or Node)
+describe('bass_120');        // "wobble bass — ramp LFO on amp gate, 8.6 Hz at A1"
+render('snare_012');         // Float32Array, 22050 Hz mono — feed it anywhere
+renderWav('rpg_levelup');    // Uint8Array: a complete .wav file, if you want a file
+effectNames();               // all 8888 names, no synthesis
 ```
 
-The package is dependency-free and build-free: `soundUrl()`/`loadManifest()` resolve via
-`import.meta.url`, so they work served from `node_modules`, through a bundler, or in Node.
-Raw files are also importable as `8bit-sfx/sfx/<category>/<name>.wav` and the manifest as
-`8bit-sfx/manifest`. Prefer plain files? Everything lives under [`sfx/`](sfx/).
+Dependency-free and build-free — pure ES modules, no bundler required, no assets to copy.
+The package is a **377 kB download** (3.0 MB unpacked): ~940 KB of engine plus the 2 MB
+catalog. No audio ships — 8888 sounds cost kilobytes of code instead of ~130 MB of WAVs.
+
+### API
+
+| | |
+|---|---|
+| `render(name)` | `Float32Array` of samples in [-1, 1) at 22050 Hz |
+| `renderPcm(name)` | `Uint8Array` of 8-bit unsigned PCM |
+| `renderWav(name)` | `Uint8Array` containing a complete `.wav` file |
+| `describe(name)` | the catalog blurb — what makes this effect different |
+| `duration(name)` / `describeFull(name)` | length in seconds / full metadata entry |
+| `effectNames()` / `CATEGORIES` / `COUNT` | the catalog's shape, without synthesizing |
+| `categoryCharacter(cat)` | the one-line description of a category |
+| `loadManifest()` | the prebuilt catalog: every effect's description and duration |
+| `new SfxPlayer()` | Web Audio playback: `resume()`, `play(name, {volume, rate})`, `muted` |
 
 ## Categories
 
-| Category | Count | Character |
-|---|---|---|
-| `jump` | 100 | upward square-wave sweeps |
-| `coin` | 100 | bright two-note pickup blips |
-| `laser` | 100 | fast downward zaps |
-| `explosion` | 100 | filtered noise booms with rumble |
-| `powerup` | 100 | rising arpeggios |
-| `hit` | 100 | short noise + square impacts |
-| `blip` | 100 | tiny UI ticks and menu selects |
-| `alarm` | 100 | alternating two-tone sirens |
-| `drone` | 100 | low engine/ambient hums |
-| `jingle` | 100 | 3–6 note melodic stingers |
-| `ambient` | 100 | wind, rain, crickets, cave drips, distant thunder |
-| `ui` | 100 | clicks, toggles, dings, error buzzes, success chimes |
-| `voice` | 100 | chip-imitated people: babble blips, grunts, laughs, sighs |
-| `dog` | 100 | barks, yips, whines, growls, pants, howls |
-| `zombie` | 100 | groans, moans, hisses, gurgles, rattling breaths |
-| `monster` | 100 | roars, screeches, snarls, chitters, stomps |
-| `water` | 100 | drips, splashes, pours, streams, underwater blubs |
-| `fire` | 100 | crackles, ignition whooshes, torch flutters, sizzles |
-| `footstep` | 100 | single steps: grass, gravel, stone, wood, snow, mud |
-| `mech` | 100 | doors, chests, levers, switches, gates, winches |
-| `person` | 100 | human body foley: heartbeats, breaths, sneezes, claps, snores |
-| `rpg` | 100 | swords, spells, potions, level-ups, loot — plus the complete [pixel-rpg](https://github.com/cportka/pixel-rpg) sound set, ported exactly |
+Each category holds **202** effects, named `<category>_000` … `<category>_201`. (The one
+exception is `rpg`: `rpg_000`–`rpg_173` plus the 28 ported sounds under their event names.)
 
-Files live at `sfx/<category>/<category>_NNN.wav` (`NNN` = `000`–`099`; the 24 ported
-game sounds in `rpg` keep their event names, e.g. `rpg_menu-open.wav`), indexed by
-[`sfx/manifest.json`](sfx/manifest.json) with per-effect **description**, duration, and
-format metadata.
+### Game sounds
 
-## Regenerating
+<!-- GAME-TABLE -->
+| Category | Character |
+|---|---|
+| `jump` | rising square hops, snappy or floaty tails |
+| `coin` | bright two-note pickup blips, classic coin grab |
+| `laser` | fast downward zaps, clean or warbled pew |
+| `explosion` | noise booms, dry cracks to sub-heavy rolling blasts |
+| `powerup` | rising scale fanfares, bright pickup arpeggios |
+| `hit` | blunt impacts, noise burst over a diving low thud |
+| `blip` | tiny UI ticks and menu selects, crisp square clicks |
+| `alarm` | alternating two-tone sirens, frantic to steady |
+| `drone` | sustained bass hums, gentle to seasick wobble |
+| `jingle` | short melodic stingers, 3-6 notes resolving upward |
+| `ambient` | wind gusts, cricket chorus, cave drips, thunder, rain, shimmer pads |
+| `ui` | menu clicks, hovers, toggles, dings, error buzzes, key ticks |
+| `voice` | chip-speech babble, grunts, hums, laughs, gasps, sighs, hey! calls |
+| `dog` | chip barks big and small, yips, whines, whimpers, growls, pants, howls |
+| `zombie` | undead groans, moans, hisses, gurgles, rattling breath, snarls |
+| `monster` | creature roars, screeches, snarls, chitter, stomps, flaps, squelches |
+| `water` | drips, splashes, pours, streams, underwater blubs |
+| `fire` | crackling campfires, ignition whooshes, torch flutter, sizzles, ember pops |
+| `footstep` | steps on grass, gravel, stone, wood, snow, mud, puddles |
+| `mech` | creaks, slams, latches, levers, switches, rattles, ratchets, key jangles |
+| `person` | heartbeats, breaths, sneezes, snores, claps, gut growls |
+| `rpg` | sword swings, spells, loot jingles, level-ups, warps, save chimes (174 generated + 28 ported) |
 
-Every effect is procedurally generated and **deterministic** — a private PRNG is seeded
-from the effect's name, so regeneration is byte-for-byte identical on any platform:
+### Musical sound design
+
+<!-- MUSIC-TABLE -->
+| Category | Character |
+|---|---|
+| `kick` | tight chip kicks, 808 drops, gated and crushed thumps |
+| `snare` | noise-and-tone backbeats, cracks, gated slams, rimshots, flams |
+| `hihat` | crisp closed ticks, open sizzles, pedal chicks, metallic sheen |
+| `tom` | tuned rack and floor toms, falling bends, roto rises, fills |
+| `cymbal` | long crashes, pinging rides, ride bells, splashes, chinas, chokes |
+| `perc` | tuned cowbells, blocks, claves, shakers, congas, agogo bells |
+| `bass` | plucked and sustained chip bass, acid sweeps, wobbles, slaps |
+| `sub` | 808 slides, deep drops, gated and growling sub-bass |
+| `lead` | square and PWM chip leads, glides, licks, echoes, stabs |
+| `pluck` | harp and marimba plucks, glassy mallets, muted stabs, octave doubles |
+| `arp` | chord-tone arpeggio runs, octave jumps, glissandi, ratchets |
+| `chord` | tuned chord stabs, power chords, wide voicings, gated chops |
+| `bell` | struck bronze bells, tubular chimes, music-box tines, shimmer tails |
+| `organ` | drawbar stacks, church pipes, rock bite, leslie swirl, percussive taps |
+| `string` | bowed swells, tremolo and spiccato bowing, pizzicato, detuned ensembles |
+| `brass` | chip brass stabs, fanfares, swells, muted buzz, section falls |
+| `reed` | breathy chip flutes, hollow clarinet, nasal oboe, ocarina, pan pipes |
+| `pad` | warm detuned beds, glassy stacks, dark slabs, filter sweeps, gated pulses |
+| `riser` | noise sweeps, pitch glides, gated builds, drum rolls, filter falls |
+| `impact` | cinematic booms, metallic slams, sub drops, braams, debris tails |
+| `glitch` | buffer stutters, bitcrush bursts, tape stops, garbled data chirps |
+| `vinyl` | crackle beds, needle drops, tape hiss, wow/flutter, static, motor hum |
+
+
+The `rpg` category also contains the complete sound set of
+[pixel-rpg](https://github.com/cportka/pixel-rpg) — 28 sounds ported exactly from that
+game's Web Audio engine, keeping their event names (`rpg_levelup`, `rpg_menu-open`, …) and
+the game's intended relative loudness in the catalog's `gain` field.
+
+## Exporting WAV files (optional)
+
+The library never needs files, but you can have them:
 
 ```sh
-npm run generate                                                # the whole library + manifest
-python3 scripts/generate_sfx.py --out /tmp/x --only jump_007    # spot-check one effect
+npm run generate                       # every effect -> sfx/<category>/<name>.wav
+npm run catalog                        # just rebuild sfx/manifest.json
+node scripts/generate.mjs --only kick_003 rpg_levelup
 ```
 
-Python 3 stdlib only — no dependencies. The ported game sounds in `rpg` are rendered by an exact port
-of that game's Web Audio engine semantics from its pure-data `SOUNDS` table. The test
-suite (`npm test`) verifies manifest/file agreement, WAV integrity, the JS API, and
-generator determinism; CI runs it on every push and PR.
+`sfx/*.wav` is git-ignored — it's an export, not a source. The testing page also has a ⬇
+button on every row that exports that one effect. Only `sfx/manifest.json` (the catalog)
+is committed and shipped.
 
-## Standalone use / forking
+## How it works
 
-The repo is fully self-contained: assets, generator, JS API, tests, and CI have no
-dependencies beyond `bash`, `python3`, and (for the JS tests) `node`, so a fork or clone
-works as a complete standalone library out of the box. (The optional `.claude/` directory
-only configures how Claude Code works in this repo — deleting it changes nothing about
-the library.)
+`src/dsp.js` holds the chip-synth primitives: a seeded xorshift PRNG, NES-style 15-bit LFSR
+noise, square/triangle/sawtooth oscillators, and a 16-level amplitude quantizer that gives
+the library its 4-bit-DAC voice. Each category in `src/generators/` is a small module that
+draws its parameters from the PRNG, renders samples, and records what it chose — which is
+where the descriptions come from, so they always describe the actual synthesis rather than
+an intention. Because the PRNG is seeded from the effect's name, the whole library is
+reproducible from under a megabyte of code.
+
+## Stability
+
+1.0.0 is a stable API commitment: the exported functions, the manifest entry shape, and
+effect naming are covered by SemVer. Effects only ever get appended — existing names keep
+their sound.
 
 ## License
 

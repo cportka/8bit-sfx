@@ -4,6 +4,64 @@ All notable changes to this project are documented here. The format follows Keep
 (https://keepachangelog.com) and the project uses Semantic Versioning (https://semver.org).
 Every change bumps the version and adds an entry below.
 
+## [1.0.0] - 2026-08-02
+
+The first stable release — and a change of substance: **effects are now synthesized on
+demand instead of shipped as audio files.**
+
+### Changed — the engine is JavaScript, and the package is a 377 kB download
+
+- **Sounds are generated on the fly, in the browser or in Node.** The synthesis engine was
+  rewritten from Python to JavaScript (`src/dsp.js` + `src/generators/*.js`), so
+  `render('kick_003')` produces its samples wherever it runs. The npm package no longer
+  contains a single `.wav`: a **377 kB download / 3.0 MB unpacked** (engine plus catalog),
+  where shipping 8888 effects as audio would have been ~130 MB.
+- **WAV export is now optional** (`npm run generate`), and `sfx/*.wav` is git-ignored.
+  `sfx/manifest.json` — the catalog of names, descriptions, and durations — is still
+  committed and shipped, so browsing 8888 effects never needs synthesis.
+- **The Python generator is retired.** There is exactly one implementation of every sound,
+  so the two can no longer drift; `scripts/generate.mjs` exports WAVs *using* that engine.
+- **Nothing you already had changed.** The JS PRNG is bit-identical to the Python one, and
+  every generator that existed in 0.4.1 was verified against its published WAVs: all 22 of
+  those categories reproduce **byte-for-byte** across every effect, ported game sounds
+  included. (The other 22 categories are new in this release.) Getting there
+  required matching a subtlety — Python's `round()` is round-half-to-even, and after the
+  16-level crush every sample lands exactly on a `.5` tie, so `Math.round` would have
+  shifted half the bytes in every file by one step.
+- **`powerup`, `fire` and `jingle` descriptions now tell all 202 variations apart.** Those
+  describers only had to separate 100 effects before, so at 202 they collapsed up to a third
+  onto identical wording. They now read the sound the way a buyer hears it — key and top
+  note, melodic shape, closing interval, pace, pulse width, crackle density — for 200-202
+  unique blurbs each (8629 of 8888 across the library). Audio is untouched: the tags behind
+  the new wording are derived from draws the generators already made.
+
+### Added
+
+- **22 musical sound-design categories** (202 each): `kick`, `snare`, `hihat`, `tom`,
+  `cymbal`, `perc`, `bass`, `sub`, `lead`, `pluck`, `arp`, `chord`, `bell`, `organ`,
+  `string`, `brass`, `reed`, `pad`, `riser`, `impact`, `glitch`, `vinyl` — a full drum kit,
+  pitched instruments, and transition/texture material for building tracks, not just game
+  events. Pitched effects report their musical note (e.g. `C3`) in the description.
+- **8888 effects across 44 categories**, uniformly 202 per category (asserted by the suite).
+  Every category grew from 100 to 202: indices `000`–`099` keep exactly the sound they had.
+- **The last four pixel-rpg sounds** — `xp`, `levelup`, `door`, `clock` — completing the
+  ported set at 28 and closing the porting backlog (#4).
+- **API:** `render()` (Float32Array), `renderPcm()`, `renderWav()` (a complete .wav),
+  `describe()`, `duration()`, `describeFull()`, `effectNames()`, `categoryCharacter()`,
+  `COUNT`, `CATEGORIES`/`GAME_CATEGORIES`/`MUSIC_CATEGORIES`. `SfxPlayer` now synthesizes
+  rather than fetching — `play()` works with no preloading at all.
+- **Testing page:** opens on an **All** view over the whole library (searchable by name and
+  description), category chips grouped game/music, live in-browser synthesis, and a **⬇ per
+  effect that exports that one sound as a `.wav`**.
+
+### Breaking
+
+- `SfxPlayer.load()` no longer fetches (it just warms the synthesis cache); `play()` works
+  without it. `soundUrl()` still resolves a path but the package ships no `.wav` files, so it
+  only resolves against an exported directory. Consumers that read `loadManifest()` — the
+  shape is unchanged — are unaffected.
+- Requires a runtime with ES modules and `TextEncoder` (Node 18+, any modern browser).
+
 ## [0.4.1] - 2026-08-01
 
 ### Added
