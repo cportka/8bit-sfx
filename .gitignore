@@ -145,3 +145,6 @@ vite.config.ts.timestamp-*
 # Python
 __pycache__/
 *.pyc
+
+# Optional WAV export — the library synthesizes on demand (npm run generate)
+sfx/*/

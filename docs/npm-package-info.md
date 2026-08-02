@@ -1,23 +1,36 @@
 # npm package status & release guide
 
-**Package name:** `8bit-sfx` · **Current version:** 0.4.0 · **Registry status: NOT YET PUBLISHED.**
+**Package name:** `8bit-sfx` · **This version:** 1.0.0 · **Registry status: PUBLISHED** —
+`0.4.1` is live on npm (`latest`); **1.0.0 is prepared here and awaits your `npm publish`.**
 
-The name `8bit-sfx` was checked against the npm registry on 2026-07-30 and is **free**
-(`https://registry.npmjs.org/8bit-sfx` returns `{"error":"Not found"}`). Until the first
-publish, consumers install straight from GitHub — this works today and is how
-[pixel-rpg](https://github.com/cportka/pixel-rpg) consumes the package:
+<https://www.npmjs.com/package/8bit-sfx>
 
 ```sh
-npm install github:cportka/8bit-sfx            # tracks main
-npm install github:cportka/8bit-sfx#<commit>   # reproducible pin (recommended)
+npm install 8bit-sfx          # the registry (how pixel-rpg consumes it)
 ```
+
+## What 1.0.0 means
+
+1.0.0 is the **stable API commitment**: the full ESM surface (21 exports — `render`,
+`renderPcm`, `renderWav`, `describe`, `describeFull`, `duration`, `effectNames`,
+`categoryCharacter`, `loadManifest`, `soundUrl`, `SfxPlayer`, `COUNT`, `CATEGORIES`,
+`GAME_CATEGORIES`, `MUSIC_CATEGORIES`, `GENERATED_COUNTS`, `VARIATIONS`, `PORTED_NAMES`,
+`SR`/`SAMPLE_RATE`, `padIndex`), the manifest entry shape (`file`, `category`,
+`description`, `duration_s`, `sample_rate`, plus `label`/`gain` on ported sounds), and
+effect naming are now covered by SemVer: breaking any of them requires 2.0.0. Existing
+effect **names keep their audio** — the generator is seeded per effect name, so effects
+only ever get appended, never re-rolled.
 
 ## What the published package contains
 
-The `files` field ships `src/` (the ESM API), `sfx/` (all WAVs + `manifest.json`),
-`scripts/generate_sfx.py`, and `CHANGELOG.md` — roughly **35 MB unpacked**, almost all of
-it audio. That is well within npm's limits but heavy for a dependency; this is normal for
-asset packages. Inspect exactly what would ship with:
+The `files` field ships `src/` (the engine — ~200 KB of JavaScript), `sfx/manifest.json`
+(the catalog), `scripts/generate.mjs`, and `CHANGELOG.md`: a **377 kB tarball / 3.0 MB unpacked**, of
+which the catalog is nearly all.
+
+**No audio files ship.** Effects are synthesized on demand from the engine, so 8888 sounds
+cost kilobytes of code rather than ~130 MB of WAVs — the reason 1.0.0 exists in this shape.
+Consumers who want files run `npm run generate` (or the ⬇ button on the testing page). Inspect
+exactly what would ship with:
 
 ```sh
 npm pack --dry-run
@@ -74,15 +87,17 @@ do ONE of them:
 - npm rejects re-publishing an existing version — the version bump in step 2 of the
   update loop is what makes `npm publish` possible. A publish that died with E403 did
   NOT consume the version; re-running with 2FA sorted will work without a new bump.
-- After publishing, tag the release (`git tag v0.4.0 && git push origin v0.4.0`) and cut
+- After publishing, tag the release (`git tag v1.0.0 && git push origin v1.0.0`) and cut
   the GitHub Release from the web UI, per the standard.
 - Consider `npm publish --provenance` when publishing from GitHub Actions in the future;
   from a laptop, plain `npm publish` is fine.
 
-## After the first publish
+## After publishing 1.0.0
 
-- Consumers can switch from the GitHub pin to the registry: `npm install 8bit-sfx@^0.4.0`.
-- pixel-rpg's dev-dependency pin (`github:cportka/8bit-sfx#<sha>`) can move to the
-  registry version at the owner's leisure — the parity test works with either source.
-- Keep `0.x` semantics until `1.0.0`: MINOR may break, PATCH fixes. The first registry
-  publish is the natural moment to consider cutting `1.0.0`.
+- **pixel-rpg needs a follow-up:** its devDependency is `^0.4.1`, and a caret range on a
+  `0.x` version will **not** resolve to `1.0.0`. Bump it to `^1.0.0` and delete the now-empty
+  `PENDING_PORT` set in `tests/sfx-package.test.mjs` (all 28 game sounds ship as of 1.0.0, so
+  that test fails on purpose until the list goes).
+- From here SemVer is strict: new categories/effects are MINOR, renames or manifest-shape
+  changes are MAJOR. The 44 × 202 uniform shape is asserted by the test suite, so growing the
+  library means growing every category together.
